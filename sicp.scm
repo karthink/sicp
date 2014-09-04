@@ -1,3 +1,4 @@
+;;--------------------------------
 ;; Exercise 1.16. Design a procedure that evolves an iterative
 ;; exponentiation process that uses successive squaring and uses a
 ;; logarithmic number of steps, as does fast-expt. (Hint: Using the
@@ -16,6 +17,8 @@
 (define (even? n)
   (= (remainder n 2) 0 ))
 
+(define (square n) (* n n))
+
 (define (fast-expt-iter b n a)
   (cond ((= n 0) a)
         ((even? n) (fast-expt-iter (square b) (/ n 2) a))
@@ -29,6 +32,7 @@
 ;;; 81 1 3   ab^n = 243
 ;;; 81 0 243 ab^n = 243
 
+;;--------------------------------
 ;; Exercise 1.17. The exponentiation algorithms in this section are
 ;; based on performing exponentiation by means of repeated
 ;; multiplication. In a similar way, one can perform integer
@@ -112,6 +116,22 @@
 ;;; a <- bq + aq + ap
 ;;; b <- bp + aq
 ;;; Gives p' = p^2 + q^2, q' = q^2 + 2 p q 
-;;; Setting (p,q) = (0,1)
-;;; (p',q') = (1,1)
+;;; Setting (p,q) = (0,1) (p',q') = (1,1)
+;;; a <- 2a + b,  b <- a + b
 
+(define (fib n)
+  (fib-iter 1 0 0 1 n))
+
+(define (fib-iter a b p q count)
+  (cond ((= count 0) b)
+        ((even? count)
+         (fib-iter a
+                   b
+                   (+ (* p p) (* q q))   ; compute p'
+                   (+ (* 2 p q) (* q q)) ; compute q'
+                   (/ count 2)))
+        (else (fib-iter (+ (* b q) (* a q) (* a p))
+                        (+ (* b p) (* a q))
+                        p
+                        q
+                        (- count 1)))))
