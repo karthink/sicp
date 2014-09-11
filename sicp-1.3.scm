@@ -213,3 +213,138 @@
   (= n (smallest-divisor n)))
 
 (filtered-accumulate + 0 square 2 inc 10 prime?)
+
+;;-------------
+;;EXERCISE 1.34
+;;-------------
+
+;;; Show that the golden ratio (section 1.2.2) is a fixed point of the
+;;; transformation x -> 1+1/x, and use this fact to compute phi by means
+;;; of the fixed-point procedure.
+
+(define tolerance 0.00001)
+
+(define (fixed-point f first-guess)
+  (define (close-enough? v1 v2)
+    (< (abs (- v1 v2)) tolerance))
+  (define (try guess)
+    (let ((next (f guess)))
+      (if (close-enough? guess next)
+          next
+          (try next))))
+  (try first-guess))
+
+(define phi
+  (fixed-point (lambda (x) (+ 1 (/ 1 x))) 1.0)) ; 1.6180327868852458
+
+
+;;; Modify fixed-point so that it prints the sequence of
+;;; approximations it generates, using the newline and display
+;;; primitives shown in exercise 1.22. Then find a solution to xx=1000
+;;; by finding a fixed point of x->log(1000)log(x). (Use Scheme's
+;;; primitive log procedure, which computes natural logarithms.)
+;;; Compare the number of steps this takes with and without average
+;;; damping. (Note that you cannot start fixed-point with a guess of
+;;; 1, as this would cause division by log(1)=0.)
+
+(define (fixed-point-verbose f first-guess)
+  (define (close-enough? v1 v2)
+    (< (abs (- v1 v2)) tolerance))
+  (define (try guess)
+    (let ((next (f guess)))
+      (cond ((close-enough? guess next) next)
+            (else (newline)
+                  (display next) 
+                  (try next)))))
+  (try first-guess))
+
+;; (fixed-point-verbose (lambda (x) (+ 1 (/ 1 x))) 1.0)
+(fixed-point-verbose (lambda (x) (/ (log 1000) (log x))) 4.0) ; 4.555539183677709
+
+;;-------------
+;;EXERCISE 1.37
+;;-------------
+
+;;; An infinite continued fraction is an expression of the form
+
+;;; f = N1 / (D1 + N2/(D2 + N3/(D3 + ...
+
+;;; As an example, one can show that the infinite continued fraction
+;;; expansion with the Ni and the Di all equal to 1 produces 1/phi, where
+;;; phi is the golden ratio (described in section 1.2.2). One way to
+;;; approximate an infinite continued fraction is to truncate the
+;;; expansion after a given number of terms. Such a truncation-a
+;;; so-called k-term finite continued fraction-has the form
+
+;;; f = N1 / (D1 + N2 / (D2 + ... + Nk / Dk
+
+;;; Suppose that n and d are procedures of one argument (the term
+;;; index i that return the Ni and Di of the terms of the continued
+;;; fraction. Define a procedure cont-frac such that evaluating
+;;; (cont-frac n d k) computes the value of the k-term finite
+;;; continued fraction.
+
+(define (cont-frac n d k)
+  (define (cont-frac-i k i)
+    (if (= k 0)
+        0
+        (/ (n i) (+ (d i)
+                    (cont-frac-i (- k 1) (+ i 1))))))
+  (cont-frac-i k 1))
+
+;; (define (cont-frac n d k)
+;;   (define (cont-frac-i k)
+;;     (if (= k 1)
+;;         (/ (n k) (d k))
+;;         (* (cont-frac-i (- k 1))        ; c * 1/ (1 + nk/dk/d(k-1))
+;;            (/ 1 
+;;               (+ 1 
+;;                  (/ (n k) 
+;;                     (d k)
+;;                     (d (- k 1))))))))
+;;   (cont-frac-i k))
+
+(cont-frac (lambda (i) 1.0)
+           (lambda (i) 1.0)
+           11)                          ; .6180555555555556
+
+;;; k should be >= 11
+
+;;; The above definition was recursive. Here's an iterative one. The
+;;; change is to count down from k instead of counting up from 1,
+;;; while accumulating results in frac. The algorithm is actually
+;;; simpler than the recursive version.
+
+(define (cont-frac n d k)
+  (define (cont-frac-iter k frac)
+    (if (= k 0)
+        frac
+        (cont-frac-iter (- k 1)
+                        (/ (n k) (+ (d k) frac)))))
+  (cont-frac-iter k 0))
+
+;;-------------
+;;EXERCISE 1.38
+;;-------------
+
+;;; e - 2 = (cont-frac (all ni = 1) (di = 1, 2, 1, 1, 4, 1, 1, 6, 1, 1...) inf)
+
+(define (n-euler i) 1.0)
+(define (d-euler i) (if (= 0 (remainder (+ 1 i) 3))
+                        (* 2 (/ (+ 1 i) 3))
+                        1))
+
+(+ 2 (cont-frac n-euler d-euler 10))    ; 2.7182817182817183
+
+;;-------------
+;;EXERCISE 1.39
+;;-------------
+
+;;; tan x = x / (1 - x^2 / (3 - x^2 / ( 5 - x^2 / ...
+
+(define (tan-cf x k)
+  (define (n-tan i) (if (= i 1) x (- (square x))))
+  (define (d-tan i) (- (* 2 i) 1))
+  (cont-frac n-tan d-tan k))
+
+(tan-cf (/ 3.1415926 4) 18)             ; .9999999732051038
