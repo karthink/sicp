@@ -234,6 +234,10 @@
           (try next))))
   (try first-guess))
 
+;;; Needed later
+(define (average-damp f)
+  (lambda (y) (/ (+ y (f y)) 2)))
+
 (define phi
   (fixed-point (lambda (x) (+ 1 (/ 1 x))) 1.0)) ; 1.6180327868852458
 
@@ -284,25 +288,14 @@
 ;;; (cont-frac n d k) computes the value of the k-term finite
 ;;; continued fraction.
 
+
 (define (cont-frac n d k)
-  (define (cont-frac-i k i)
-    (if (= k 0)
+  (define (cont-frac-rec i)
+    (if (< k i)
         0
         (/ (n i) (+ (d i)
-                    (cont-frac-i (- k 1) (+ i 1))))))
-  (cont-frac-i k 1))
-
-;; (define (cont-frac n d k)
-;;   (define (cont-frac-i k)
-;;     (if (= k 1)
-;;         (/ (n k) (d k))
-;;         (* (cont-frac-i (- k 1))        ; c * 1/ (1 + nk/dk/d(k-1))
-;;            (/ 1 
-;;               (+ 1 
-;;                  (/ (n k) 
-;;                     (d k)
-;;                     (d (- k 1))))))))
-;;   (cont-frac-i k))
+                    (cont-frac-rec (+ i 1))))))
+  (cont-frac-rec 1))
 
 (cont-frac (lambda (i) 1.0)
            (lambda (i) 1.0)
@@ -312,8 +305,7 @@
 
 ;;; The above definition was recursive. Here's an iterative one. The
 ;;; change is to count down from k instead of counting up from 1,
-;;; while accumulating results in frac. The algorithm is actually
-;;; simpler than the recursive version.
+;;; while accumulating results in frac.
 
 (define (cont-frac n d k)
   (define (cont-frac-iter k frac)
@@ -336,6 +328,7 @@
 
 (+ 2 (cont-frac n-euler d-euler 10))    ; 2.7182817182817183
 
+
 ;;-------------
 ;;EXERCISE 1.39
 ;;-------------
@@ -343,8 +336,249 @@
 ;;; tan x = x / (1 - x^2 / (3 - x^2 / ( 5 - x^2 / ...
 
 (define (tan-cf x k)
-  (define (n-tan i) (if (= i 1) x (- (square x))))
+  (define (n-tan i) (if (= i 1) x (- (* x x))))
   (define (d-tan i) (- (* 2 i) 1))
   (cont-frac n-tan d-tan k))
 
 (tan-cf (/ 3.1415926 4) 18)             ; .9999999732051038
+
+
+;;-------------
+;;EXERCISE 1.40
+;;-------------
+
+;;;  Exercise 1.40. Define a procedure cubic that can be used together
+;;;  with the newtons-method procedure in expressions of the form
+
+;; (define (cubic a b c)
+;;   'your-answer-here)
+;; (newtons-method (cubic a b c) 1)
+
+;;; to approximate zeros of the cubic x3+ax2+bx+c.
+
+;;; Newton's method definitons:
+
+(define (deriv g)
+  (lambda (x)
+    (/ (- (g (+ x dx)) (g x))
+       dx)))
+
+(define dx 0.00001)
+
+(define (newton-transform g)
+  (lambda (x)
+    (- x (/ (g x) ((deriv g) x)))))
+
+(define (newtons-method g guess)
+  (fixed-point (newton-transform g) guess))
+
+;;; cubic
+
+(define (cubic a b c)
+  (lambda (x) (+ c (* b x) (* a x x) (* x x x))))
+
+;;; Test
+(newtons-method (cubic -1 0 0) 1.5)     ;1.000000000000071
+(newtons-method (cubic -1 0 0) 0.5)     ;-4.0295529188748996e-10 ~ 0
+
+;;-------------
+;;EXERCISE 1.41
+;;-------------
+
+;;; Define a procedure double that takes a procedure of one argument
+;;; as argument and returns a procedure that applies the original
+;;; procedure twice. For example, if inc is a procedure that adds 1 to
+;;; its argument, then (double inc) should be a procedure that adds 2.
+
+(define (double f)
+  (lambda (y) (f (f y))))
+
+(define (inc x) (+ x 1))
+(define (square x) (* x x))
+
+(((double (double double)) inc) 5)      ;21
+
+;;; (double double) := (lambda (f) (double (double f)))
+;;; (double (double double)) := (lambda (f) (double (double (double (double f)))))
+;;; When applied to inc:
+;;; (((lambda (f) (double (double (double (double f))))) inc) x)
+;;; ((double (double (double (double inc)))) x)
+;;; ((double (double (double (lambda (y) (inc (inc y)))))) x)
+;;; ((double (double (lambda (y) (inc (inc (inc (inc y))))))) x)
+;;; ((double (lambda (y) (inc (inc (inc (inc (inc (inc (inc (inc y)))))))))) x)
+;;; ((lambda (y) (inc (inc (inc (inc (inc (inc (inc (inc (inc (inc (inc (inc (inc (inc (inc (inc x))))))))))))))))) x)
+;;; So inc is applied 16 times, raising x by 1 each time.
+
+;;-------------
+;;EXERCISE 1.42
+;;-------------
+
+;;; Let f and g be two one-argument functions. The composition f after
+;;; g is defined to be the function x f(g(x)). Define a procedure
+;;; compose that implements composition.
+
+(define (compose f g)
+  (lambda (y) (f (g y))))
+
+((compose square inc) 6)                ; 49
+
+;;-------------
+;;EXERCISE 1.43
+;;-------------
+
+;;; If f is a numerical function and n is a positive integer, then we
+;;; can form the nth repeated application of f, which is defined to be
+;;; the function whose value at x is f(f(...(f(x))...)). For example, if f
+;;; is the function x->x+1, then the nth repeated application of f is
+;;; the function x->x+n. If f is the operation of squaring a number,
+;;; then the nth repeated application of f is the function that raises
+;;; its argument to the 2nth power. Write a procedure that takes as
+;;; inputs a procedure that computes f and a positive integer n and
+;;; returns the procedure that computes the nth repeated application
+;;; of f.
+
+;;; Recursive
+(define (repeated f n)
+  (if (= n 1) f
+      (compose f (repeated f (- n 1)))))
+
+;;; Iterative
+(define (repeated f n)
+  
+  (define (repeated-iter f k f-rep)
+    (if (= k n)
+        f-rep
+        (repeated-iter f (+ k 1) (compose f f-rep))))
+  
+  (repeated-iter f 1 f))
+
+;;; Test it
+((repeated square 2) 5)                         ;625
+((repeated sqrt 2) 625)                         ;5.0
+
+;;; Using 'repeated to run 'fixed-point 8 times and find the sqrt of
+;;; 25
+
+((repeated (lambda (x)
+             (/ (+ x (/ 25 x))
+                2))
+           8) 1.0)                      ;5.0
+
+;;-------------
+;;EXERCISE 1.44
+;;-------------
+
+;;; The idea of smoothing a function is an important concept in signal
+;;; processing. If f is a function and dx is some small number, then
+;;; the smoothed version of f is the function whose value at a point x
+;;; is the average of f(x-dx), f(x), and f(x+dx). Write a procedure
+;;; smooth that takes as input a procedure that computes f and returns
+;;; a procedure that computes the smoothed f. It is sometimes valuable
+;;; to repeatedly smooth a function (that is, smooth the smoothed
+;;; function, and so on) to obtained the n-fold smoothed function.
+;;; Show how to generate the n-fold smoothed function of any given
+;;; function using smooth and repeated from exercise 1.43.
+
+(define dx 0.1)
+
+(define (smooth f)
+  (lambda (x) (+ (f x) (f (- x dx)) (f (+ x dx)))))
+
+
+;;-------------
+;;EXERCISE 1.45
+;;-------------
+
+;;; We saw in section 1.3.3 that attempting to compute square roots by
+;;; naively finding a fixed point of y->x/y does not converge, and
+;;; that this can be fixed by average damping. The same method works
+;;; for finding cube roots as fixed points of the average-damped
+;;; y->x/y^2. Unfortunately, the process does not work for fourth
+;;; roots -- a single average damp is not enough to make a fixed-point
+;;; search for y->x/y^3 converge. On the other hand, if we average
+;;; damp twice (i.e., use the average damp of the average damp of
+;;; y->x/y^3) the fixed-point search does converge. Do some
+;;; experiments to determine how many average damps are required to
+;;; compute nth roots as a fixed-point search based upon repeated
+;;; average damping of y->x/y^n-1. Use this to implement a simple
+;;; procedure for computing nth roots using fixed-point, average-damp,
+;;; and the repeated procedure of exercise 1.43. Assume that any
+;;; arithmetic operations you need are available as primitives.
+
+;;; Some primitives we need:
+(define (square y) (* y y))
+
+(define (exp y n)
+  (cond ((= n 0) 1)
+        ((even? n) (square (exp y (/ n 2))))
+        (else (* y (square (exp y (/ (- n 1) 2)))))))
+
+;;; A general nth-root function: nth root of x with k-time
+;;; average-damping.
+(define (nth-root-avg-damp x n k)
+  (fixed-point
+   ((repeated average-damp k)
+    (lambda (y) (/ x (exp y (- n 1)))))
+   1.0))
+
+;;; Required k for a given n   
+ ;; |  n | k |
+ ;; |  2 | 1 |
+ ;; |  3 | 1 |
+ ;; |  4 | 2 |
+ ;; |  5 | 2 |
+ ;; |  6 | 2 |
+ ;; |  7 | 2 |
+ ;; |  8 | 3 |
+ ;; |  9 | 3 |
+ ;; | 10 | 3 |
+ ;; | 11 | 3 |
+ ;; | 12 | 3 |
+ ;; | 13 | 3 |
+ ;; | 14 | 3 |
+ ;; | 15 | 3 |
+ ;; | 16 | 4 |
+
+;;; k=2 works for 4 powers, 3-7. k=3 works for 8 powers, 8-15.
+;;; Hunch: k will work for 2^k powers. (k=4 works for 16-31 and fail on k=32. This can be confirmed.)
+
+;;; So k will work for n = 2^k to 2^(k+1) - 1. So given an n, we can find k by taking the log of n to base 2 and discarding the non-integer bit:
+
+(define (times-avg-damp n)
+  (truncate (/ (log n) (log 2))))
+
+(define (nth-root x n)
+  (nth-root-avg-damp x n (times-avg-damp n)))
+
+;;; Test:
+(nth-root 15625 64)                     ;1.1628626935731257
+(nth-root 6.4e14 80)                    ;1.5313603602212593
+
+;;; Done!
+
+;;-------------
+;;EXERCISE 1.46
+;;-------------
+
+;;;  Several of the numerical methods described in this chapter are
+;;;  instances of an extremely general computational strategy known as
+;;;  iterative improvement. Iterative improvement says that, to
+;;;  compute something, we start with an initial guess for the answer,
+;;;  test if the guess is good enough, and otherwise improve the guess
+;;;  and continue the process using the improved guess as the new
+;;;  guess. Write a procedure iterative-improve that takes two
+;;;  procedures as arguments: a method for telling whether a guess is
+;;;  good enough and a method for improving a guess. Iterative-improve
+;;;  should return as its value a procedure that takes a guess as
+;;;  argument and keeps improving the guess until it is good enough.
+;;;  Rewrite the sqrt procedure of section 1.1.7 and the fixed-point
+;;;  procedure of section 1.3.3 in terms of iterative-improve.
+
+(define (iterative-improve good-enough? improve)
+  (define (my-iterate-improve guess)
+    (if (good-enough? guess)
+        guess
+        (my-iterate-improve (improve guess))))
+  my-iterate-improve)
+
+
