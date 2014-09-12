@@ -1,3 +1,12 @@
+;;; Required primitives
+
+(define (inc x) (+ x 1))
+(define (square x) (* x x))
+(define (average x y) (/ (+ x y) 2))
+(define tolerance 0.00001)
+(define (average-damp f)
+  (lambda (y) (/ (+ y (f y)) 2)))
+
 ;;--------------
 ;; EXERCISE 1.29
 ;;--------------
@@ -574,6 +583,8 @@
 ;;;  Rewrite the sqrt procedure of section 1.1.7 and the fixed-point
 ;;;  procedure of section 1.3.3 in terms of iterative-improve.
 
+;;; Here are two versions of iterative-improve:
+
 (define (iterative-improve good-enough? improve)
   (define (my-iterate-improve guess)
     (if (good-enough? guess)
@@ -581,13 +592,36 @@
         (my-iterate-improve (improve guess))))
   my-iterate-improve)
 
-(define tolerance 0.00001)
+(define (iterative-improve good-enough? improve)
+  (lambda (guess)
+    (if (good-enough? guess)
+        guess
+        ((iterative-improve good-enough? improve)
+         (improve guess)))))
 
+;;; The first one is clearer to me because it's clear what the
+;;; procedure being returned is (my-iterate-improve). In the second,
+;;; the procedure being returned is a lambda that calls iterative-improve
+;;; itself, which returns a lambda that calls an iterative-improve that
+;;; returns... Well, it gets confusing.
+
+;;; fixed-point written with iterative-improve
+;;; The improve function is f itself.
+
+(define tolerance 0.00001)
 (define (fixed-point f first-guess)
   ((iterative-improve (lambda (g)
                         (< (abs (- g (f g))) tolerance))
-                      (lambda (g)
-                        (f g)))
+                      f)
    first-guess))
 
+;;; sqrt-iter written with iterative-improve
+
+(define (average x y) (/ (+ x y) 2))
+(define (sqrt-iter first-guess x)
+  ((iterative-improve (lambda (g)
+                        (< (abs (- (square g) x)) tolerance))
+                      (lambda (g)
+                        (average g (/ x g))))
+   first-guess))
 
