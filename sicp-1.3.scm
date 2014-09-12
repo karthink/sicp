@@ -515,7 +515,7 @@
 
 ;;; A general nth-root function: nth root of x with k-time
 ;;; average-damping.
-(define (nth-root-avg-damp x n k)
+(define (nth-root-unstable x n k)
   (fixed-point
    ((repeated average-damp k)
     (lambda (y) (/ x (exp y (- n 1)))))
@@ -548,7 +548,7 @@
   (truncate (/ (log n) (log 2))))
 
 (define (nth-root x n)
-  (nth-root-avg-damp x n (times-avg-damp n)))
+  (nth-root-unstable x n (times-avg-damp n)))
 
 ;;; Test:
 (nth-root 15625 64)                     ;1.1628626935731257
@@ -580,5 +580,14 @@
         guess
         (my-iterate-improve (improve guess))))
   my-iterate-improve)
+
+(define tolerance 0.00001)
+
+(define (fixed-point f first-guess)
+  ((iterative-improve (lambda (g)
+                        (< (abs (- g (f g))) tolerance))
+                      (lambda (g)
+                        (f g)))
+   first-guess))
 
 
