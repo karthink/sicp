@@ -145,7 +145,7 @@
 ;;; of a still more general notion called accumulate that combines a
 ;;; collection of terms, using some general accumulation function:
 
-(accumulate combiner null-value term a next b)
+;;; (accumulate combiner null-value term a next b)
 
 ;;; Accumulate takes as arguments the same term and range
 ;;; specifications as sum and product, together with a combiner
@@ -560,8 +560,8 @@
   (nth-root-unstable x n (times-avg-damp n)))
 
 ;;; Test:
-(nth-root 15625 64)                     ;1.1628626935731257
-(nth-root 6.4e14 80)                    ;1.5313603602212593
+;; (nth-root 15625 64)                     ;1.1628626935731257
+;; (nth-root 6.4e14 80)                    ;1.5313603602212593
 
 ;;; Done!
 
