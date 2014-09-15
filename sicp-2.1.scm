@@ -89,7 +89,6 @@
                (y-point (end-segment s)))))
 
 
-
 ;; (setq last-kbd-macro
 ;;    [?\C-y ?\C-x ?\C-x ?\M-f ?\C-f ?\C-x ?r ?n ?a ?\C-f ?\C-x ?r ?n ?b ?\C-a ?\M-k ?\; ?\; ?\; ?\M-q ?\M-o ?\M-o ?\; ?- tab ?e ?x ?e ?r ?c ?i ?s ?e ?  ?\C-x ?r ?i ?a ?\C-f ?. ?\C-x ?r ?i ?b tab ?\C-k ?\M-\]])
 
@@ -249,5 +248,126 @@ x
 ;;; (n1 f) is a lambda that composes f with itself n1 times. ((n1 f) x) is
 ;;; (f (f (f ....f x). To apply f (n1 + n2) times on x, we call (n2 f) on
 ;;; the result of ((n1 f) x).
+
+;;; Also, we can write: (define (add n1 n2) ((n1 add-1) n2))
+
+;;------------
+;;EXERCISE 2.7
+;;------------
+
+;;; Alyssa's program is incomplete because she has not specified the
+;;; implementation of the interval abstraction. Here is a definition
+;;; of the interval constructor:
+
+(define (make-interval a b) (cons a b))
+
+;;; Define selectors upper-bound and lower-bound to complete the
+;;; implementation.
+
+(define (upper-bound interval)
+  (max (car interval) (cdr interval)))
+
+(define (lower-bound interval)
+  (min (car interval) (cdr interval)))
+
+
+(define (add-interval x y)
+  (make-interval (+ (lower-bound x) (lower-bound y))
+                 (+ (upper-bound x) (upper-bound y))))
+
+(define (mul-interval x y)
+  (let ((p1 (* (lower-bound x) (lower-bound y)))
+        (p2 (* (lower-bound x) (upper-bound y)))
+        (p3 (* (upper-bound x) (lower-bound y)))
+        (p4 (* (upper-bound x) (upper-bound y))))
+    (make-interval (min p1 p2 p3 p4)
+                   (max p1 p2 p3 p4))))
+
+(define (div-interval x y)
+  (mul-interval x
+                (make-interval (/ 1.0 (upper-bound y))
+                               (/ 1.0 (lower-bound y)))))
+
+;;------------
+;;EXERCISE 2.8
+;;------------
+
+;;; Using reasoning analogous to Alyssa's, describe how the difference
+;;; of two intervals may be computed. Define a corresponding
+;;; subtraction procedure, called sub-interval.
+
+(define (sub-interval x y)
+  (make-interval (- (lower-bound x) (upper-bound y))
+                 (- (upper-bound x) (lower-bound y))))
+
+;;;  OR
+
+(define (sub-interval x y)
+  (add-interval x (make-interval (- (upper-bound y))
+                                 (- (lower-bound y)))))
+
+
+;;------------
+;;EXERCISE 2.9
+;;------------
+
+;;; The width of an interval is half of the difference between its
+;;; upper and lower bounds. The width is a measure of the uncertainty
+;;; of the number specified by the interval. For some arithmetic
+;;; operations the width of the result of combining two intervals is a
+;;; function only of the widths of the argument intervals, whereas for
+;;; others the width of the combination is not a function of the
+;;; widths of the argument intervals. Show that the width of the sum
+;;; (or difference) of two intervals is a function only of the widths
+;;; of the intervals being added (or subtracted). Give examples to
+;;; show that this is not true for multiplication or division.
+
+;;; Sum: let the widths be w1 and w2, and the lower and upper bounds
+;;; be l1,l2,u1,u2. Then the sum is (make-interval (+ l1 l2) (+ u1
+;;; u2)), which has width
+
+;; (- (+ u1 u2) (+ l1 l2)) 
+
+;;; Which is (u2 - l2) + (u1 - l1) = 2(w2 + w1). The same applies to
+;;; subtraction.
+
+;;; Mult/div:
+
+(define (width-interval x) (/ (- (upper-bound x) (lower-bound x)) 2))
+
+(define i1 (make-interval 0 2))
+(define i2 (make-interval 4 1))
+
+(width-interval i1)                     ; 1
+(width-interval i2)                     ; 3:2
+(width-interval (mul-interval i1 i2))   ; 4
+
+(define j1 (make-interval 1 3))         ; same width as i1
+(define j2 (make-interval 1 4))         ; same width as i2
+
+(width-interval j1)                     ; 1
+(width-interval j2)                     ; 3:2
+(width-interval (mul-interval j1 j2))   ; 11/2 != 4
+
+;;; The same holds for division because it is defined in terms of
+;;; mul-interval
+
+;;-------------
+;;EXERCISE 2.10
+;;-------------
+
+;;; Ben Bitdiddle, an expert systems programmer, looks over Alyssa's
+;;; shoulder and comments that it is not clear what it means to divide
+;;; by an interval that spans (includes) zero. Modify Alyssa's code to
+;;; check for this condition and to signal an error if it occurs.
+
+(define (div-interval x y)
+  (let ((ly (lower-bound y)) (uy (upper-bound y)))
+    (cond ((same-sign? ly uy)
+           (mul-interval x
+                         (make-interval (/ 1.0 (upper-bound y))
+                                        (/ 1.0 (lower-bound y)))))
+          ((or (= 0 ly) (= 0 uy)) (error "End points include 0"))
+          (else (error "Interval includes 0")))))
 
 
