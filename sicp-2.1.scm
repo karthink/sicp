@@ -367,7 +367,221 @@ x
            (mul-interval x
                          (make-interval (/ 1.0 (upper-bound y))
                                         (/ 1.0 (lower-bound y)))))
-          ((or (= 0 ly) (= 0 uy)) (error "End points include 0"))
           (else (error "Interval includes 0")))))
 
+;;-------------
+;;EXERCISE 2.11
+;;-------------
+
+;;; In passing, Ben also cryptically comments: "By testing the signs
+;;; of the endpoints of the intervals, it is possible to break
+;;; mul-interval into nine cases, only one of which requires more than
+;;; two multiplications." Rewrite this procedure using Ben's
+;;; suggestion.
+
+;; 9 cases:
+
+;; | x to the right of 0 |         | y to the right of 0 |
+;; | x to the left of 0  |    X    | y to the left of 0  |
+;; | x containing 0      |         | y containing 0      |
+
+;; 1. Both to the right of zero:
+;; (* (lower-bound x) (lower-bound y))
+;; (* (upper-bound x) (upper-bound y))
+
+;; 2. Both to the left of zero:
+;; (* (upper-bound x) (upper-bound y))
+;; (* (lower-bound x) (lower-bound y))
+
+;; 3. x to the left, y to the right
+;; (* (lower-bound x) (upper-bound y))
+;; (* (upper-bound x) (lower-bound y))
+
+;; 4. x to the right, y to the left
+;; (the opposite of 3)
+
+;; 5. x containing 0, y to the right
+;; (* (lower-bound x) (upper-bound y))
+;; (* (upper-bound x) (upper-bound y))
+
+;; 6. x containing 0, y to the left
+;; (* (upper-bound x) (lower-bound y))
+;; (* (lower-bound x) (lower-bound y))
+
+;; 7,8. y containing 0, x to the left/right
+;; (opposites of 5 & 6)
+
+;; 9. x and y both contain 0
+;; (min (* (lower-bound x) (upper-bound y))
+;;      (* (upper-bound x) (lower-bound y)))
+;; (max (* (lower-bound x) (lower-bound y))
+;;      (* (upper-bound x) (upper-bound y)))
+
+;;; Here's the function
+
+(define (mul-interval x y)
+  (let ((lx (lower-bound x))
+        (ly (lower-bound y))
+        (ux (upper-bound x))
+        (uy (upper-bound y)))
+    (cond ((and  (same-sign? lx ux)
+                 (same-sign? lx uy)
+                 (same-sign? lx ly))
+           ;; Cases 1 & 2
+           (make-interval (* lx ly) (* ux uy)))
+
+          ((and (same-sign? lx ux)
+                (same-sign? ly uy))
+           ;; Cases 3 & 4
+           (make-interval (* lx uy) (* ux ly)))
+
+          ((and (not (same-sign? lx ux))
+                (same-sign? ly uy))
+           ;; Cases 5 & 6
+           (if (> ly 0) 
+               (make-interval (* lx uy) (* ux uy))
+               (make-interval (* lx ly) (* ux ly))))
+
+          ((and (not (same-sign? ly uy))
+                (same-sign? lx ux))
+           ;; Cases 7 & 8
+           (if (> lx 0) 
+               (make-interval (* ly ux) (* uy ux))
+               (make-interval (* ly lx) (* uy lx))))
+
+          (else
+           (make-interval (min (* lx uy)
+                               (* ux ly))
+                          (max (* lx ly)
+                               (* ux uy)))))))
+
+;;; It might be possible to make this much cleaner with a more
+;;; suitable helper function than same-sign?
+
+;;; Here's how to test it.
+(define (test-mul x1 x2 y1 y2)
+  (let ((i1 (make-interval x1 x2))
+        (i2 (make-interval y1 y2)))
+    (display i1)
+    (newline)
+    (display i2)
+    (newline)
+    (mul-interval i1 i2)))
+
+  
+;;; After debugging her program, Alyssa shows it to a potential user,
+;;; who complains that her program solves the wrong problem. He wants
+;;; a program that can deal with numbers represented as a center value
+;;; and an additive tolerance; for example, he wants to work with
+;;; intervals such as 3.5 +/- 0.15 rather than [3.35, 3.65]. Alyssa
+;;; returns to her desk and fixes this problem by supplying an
+;;; alternate constructor and alternate selectors:
+
+;;-------------
+;;EXERCISE 2.12
+;;-------------
+
+(define (make-center-width c w)
+  (make-interval (- c w) (+ c w)))
+
+(define (center i)
+  (/ (+ (lower-bound i) (upper-bound i)) 2))
+
+(define (width i)
+  (/ (- (upper-bound i) (lower-bound i)) 2))
+
+;;; Define a constructor make-center-percent that takes a center and a
+;;; percentage tolerance and produces the desired interval. You must
+;;; also define a selector percent that produces the percentage
+;;; tolerance for a given interval. The center selector is the same as
+;;; the one shown above.
+
+(define (make-center-percent center percent)
+  (make-center-width center (/ (* percent center) 100)))
+
+(define (percent interval)
+  (* 100 (/ (width interval) (center interval))))
+
+;;-------------
+;;EXERCISE 2.13
+;;-------------
+
+;;; Show that under the assumption of small percentage tolerances
+;;; there is a simple formula for the approximate percentage tolerance
+;;; of the product of two intervals in terms of the tolerances of the
+;;; factors. You may simplify the problem by assuming that all numbers
+;;; are positive.
+
+;; In the (center,percent) formulation:
+;; (C1,p1): [C1 - p1 C1, C1 + p1 C1]
+;; (C2,p2): [C2 - p2 C2, C2 + p2 C2]
+
+;; All positive, so the product is:
+
+;; [C1 C2 - (p1 + p2)C1 C2 + p1 p2 C1 C2,
+;;  C1 C2 + (p1 + p2) C1 C2 + p1 p2 C1 C2]
+
+;; For small p1 & p2, we can neglect the second order term.
+
+;; [C1 C2 - (p1 + p2) C1 C2, C1 C2 + (p1 + p2) C1 C2]
+;; (C1 C2, p1 + p2)
+
+;; So the percentages add.
+
+(define (par1 r1 r2)
+  (div-interval (mul-interval r1 r2)
+                (add-interval r1 r2)))
+ 
+(define (par2 r1 r2)
+  (let ((one (make-interval 1 1)))
+    (div-interval one
+                  (add-interval (div-interval one r1)
+                                (div-interval one r2)))))
+
+;;-------------
+;;EXERCISE 2.14
+;;-------------
+
+;;; Demonstrate that Lem is right. Investigate the behavior of the
+;;; system on a variety of arithmetic expressions. Make some intervals
+;;; A and B, and use them in computing the expressions A/A and A/B.
+;;; You will get the most insight by using intervals whose width is a
+;;; small percentage of the center value. Examine the results of the
+;;; computation in center-percent form (see Exercise 2-12).
+
+;; (setq last-kbd-macro
+;;    [?\M-d ?\C-x ?r ?n ?a ?\C-x ?r ?n ?b ?\C-f ?\C-x ?r ?n ?b ?\C-  ?\C-a ?\C-w ?\C-d ?\C-d ?\C-b ?\C-d ?\M-o ?\M-o ?\; ?- tab ?e ?x ?e ?r ?c ?i ?s ?e ?  ?\C-x ?r ?i ?a ?\C-f ?. ?\C-x ?r ?i ?b tab ?\C-k ?\C-n ?\; ?\; ?\; ?  ?\M-q ?\M-\]])
+
+(define A (make-center-width 1000 5))
+(define B (make-center-width 300 1))
+
+(div-interval A A)                      ;(.99004 . 1.01005)
+;;; This should be (1.0 .. 1.0), because A/A = 1.0 irrespective of our
+;;; uncertainty about A. This is one source of the error.
+
+;;--------------------
+;;EXERCISE 2.15 & 2.16
+;;--------------------
+
+;;; Eva Lu Ator, another user, has also noticed the different
+;;; intervals computed by different but algebraically equivalent
+;;; expressions. She says that a formula to compute with intervals
+;;; using Alyssa's system will produce tighter error bounds if it can
+;;; be written in such a form that no variable that represents an
+;;; uncertain number is repeated. Thus, she says, par2 is a "better"
+;;; program for parallel resistances than par1. Is she right? Why?
+
+;;; Explain, in general, why equivalent algebraic expressions may lead
+;;; to different answers. Can you devise an interval-arithmetic
+;;; package that does not have this shortcoming, or is this task
+;;; impossible? (Warning: This problem is very difficult.)
+
+;;; She's right, because every additional appearance of an uncertain
+;;; variable widens the uncertainty interval--even repeated
+;;; appearances of the same variable. This is shown by A/A in ex. 2.14
+;;; above. 
+
+;;; Designing an interval-arithmetic package: Doesn't seem impossible,
+;;; but I will return to this when I can use lists and other data
+;;; structures.
 
