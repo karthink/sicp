@@ -355,6 +355,25 @@
 ;;; (fringe (list x x))
 ;;; (1 2 3 4 1 2 3 4)
 
+;;; I was first inclined to try this:
+
+(define (fringe lst)
+  (cond ((null? lst) nil)
+        ((not (pair? (car lst))) lst)
+        (else (cons (fringe (car lst)) (fringe (cdr lst))))))
+
+;;; But this simply reproduces the structure of lst. The reason is
+;;; simple. If x is
+
+(define x (cons 'y 'z)) ;(y . z)
+
+;;; Then consing its car and cdr will give us a duplicate of x:
+
+(cons (car x) (cdr x))  ;(y . z)
+
+;;; The right way to flatten a tree into a list is to use append
+;;; instead of cons.
+
 (define (fringe lst)
   (cond ((null? lst) nil)
         ((not (pair? (car lst))) lst)
@@ -404,15 +423,306 @@
 ;;; Using your selectors, define a procedure total-weight that returns
 ;;; the total weight of a mobile.
 
-(define (total-weight mobile)
-  (define (branch-weight branch)
+(define (branch-weight branch)
   (let ((s (branch-structure branch)))
     (cond ((not (pair? s)) s)
           (else (total-weight s)))))
+
+(define (total-weight mobile)
   (+ (branch-weight (left-branch mobile))
      (branch-weight (right-branch mobile))))
 
-;;; 2. If mobile 
+(define level-1-mobile (make-mobile (make-branch 2 2) 
+                                    (make-branch 1 1))) 
+(define level-2-mobile (make-mobile (make-branch 3 level-1-mobile) 
+                                    (make-branch 9 1))) 
+(define level-3-mobile (make-mobile (make-branch 4 level-2-mobile) 
+                                    (make-branch 8 2))) 
+
+;;; A mobile is said to be balanced if the torque applied by its
+;;; top-left branch is equal to that applied by its top-right branch
+;;; (that is, if the length of the left rod multiplied by the weight
+;;; hanging from that rod is equal to the corresponding product for
+;;; the right side) and if each of the submobiles hanging off its
+;;; branches is balanced. Design a predicate that tests whether a
+;;; binary mobile is balanced.
+
+(define (is-mobile? branch)
+  (pair? (branch-structure branch)))
+
+(define (branch-torque branch)
+  (* (branch-weight branch) (branch-length branch)))
+
+(define (balanced? mobile)
+  (let ((lb (left-branch mobile))
+        (rb (right-branch mobile)))
+    (and  (= (branch-torque lb)
+             (branch-torque rb))
+          (if (is-mobile? lb)
+              (balanced? (branch-structure lb))
+              #t)
+          (if (is-mobile? rb)
+              (balanced? (branch-structure rb))
+              #t))))
+
+(define level-4-mobile (make-mobile (make-branch 1 level-3-mobile)
+                                    (make-branch 4 6)))
 
 ;; (setq last-kbd-macro
 ;;    [?\M-d ?\C-x ?r ?n ?a ?\C-x ?r ?n ?b ?\C-f ?\C-x ?r ?n ?b ?\C-  ?\C-a ?\C-w ?\C-d ?\C-d ?\C-b ?\C-d ?\M-o ?\M-o ?\; ?- tab ?e ?x ?e ?r ?c ?i ?s ?e ?  ?\C-x ?r ?i ?a ?\C-f ?. ?\C-x ?r ?i ?b tab ?\C-k ?\C-n ?\; ?\; ?\; ?  ?\M-q ?\M-\]])
+
+;;; Suppose we change the representation of mobiles so that the
+;;; constructors are
+
+(define (make-mobile left right)
+  (cons left right))
+
+(define (make-branch length structure)
+  (cons length structure))
+
+;;; How much do you need to change your programs to convert to the new
+;;; representation?
+
+;;; We need to replace cadr in all the selectors with cdr. That's it.
+;;; None of the above functions are affected because they manipulate
+;;; mobiles only with these selectors.
+
+(define (left-branch mobile)
+  (car mobile))
+
+(define (right-branch mobile)
+  (cdr mobile))
+
+(define (branch-length branch)
+  (car branch))
+
+(define (branch-structure branch)
+  (cdr branch))  
+
+;;-------------
+;;EXERCISE 2.30
+;;-------------
+
+;;; Define a procedure square-tree analogous to the square-list
+;;; procedure of Exercise 2-21. That is, square-list should behave as
+;;; follows:
+
+(square-tree
+ (list 1
+       (list 2 (list 3 4) 5)
+       (list 6 7)))
+
+;(1 (4 (9 16) 25) (36 49))
+
+(define (square-tree tree)
+  (cond ((null? tree) nil)
+        ((not (pair? tree)) (square tree))
+        (else (cons (square-tree (car tree))
+                    (square-tree (cdr tree))))))
+
+;;; OR
+
+(define (square-tree tree)
+  (map (lambda (sub-tree)
+         (if (pair? sub-tree)
+             (square-tree sub-tree)
+             (square sub-tree)))
+       tree))
+
+;;-------------
+;;EXERCISE 2.31
+;;-------------
+
+;;; Abstract your answer to Exercise 2-30 to produce a procedure
+;;; tree-map with the property that square-tree could be defined as
+
+(define (square-tree tree) (tree-map square tree))
+
+(define (tree-map f tree)
+  (cond ((null? tree) nil)
+        ((pair? tree) (cons (tree-map f (car tree))
+                            (tree-map f (cdr treee))))
+        (else (f tree))))
+
+;;-------------
+;;EXERCISE 2.32
+;;-------------
+
+;;; We can represent a set as a list of distinct elements, and we can
+;;; represent the set of all subsets of the set as a list of lists.
+;;; For example, if the set is (1 2 3), then the set of all subsets is
+;;; (() (3) (2) (2 3) (1) (1 3) (1 2) (1 2 3)). Complete the following
+;;; definition of a procedure that generates the set of subsets of a
+;;; set and give a clear explanation of why it works:
+
+(define (subsets s)
+  (if (null? s)
+      (list nil)
+      (let ((rest (subsets (cdr s))))
+        (append rest (map (lambda (lst) (cons (car s) lst))
+                          rest)))))
+
+;;; The missing piece (procedure that map maps) is
+
+;;; (lambda (lst) (cons (car s) lst))
+
+;;; Why it works: The list of all subsets of a list is:
+;;; 1. The list of all subsets of the list without the first element,
+;;; appended to 
+;;; 2. The list of all subsets of the list with the first element,
+;;; 3. Where subsets of the empty list is (list '()). 
+
+;;-------------
+;;EXERCISE 2.33
+;;-------------
+
+;;; Fill in the missing expressions to complete the following
+;;; definitions of some basic list-manipulation operations as
+;;; accumulations:
+
+;;; Some primitives
+(define (accumulate op initial sequence)
+  (if (null? sequence)
+      initial
+      (op (car sequence) (accumulate op initial (cdr sequence)))))
+
+(define (filter predicate sequence)
+  (cond ((null? sequence) nil)
+        ((predicate (car sequence)) (cons (car sequence)
+                                          (filter predicate (cdr sequence))))
+        (else (filter predicate (cdr sequence)))))
+
+
+(define (my-map p sequence)
+  (accumulate (lambda (x y) (cons (p x) y)) nil sequence))
+
+(define (append seq1 seq2)
+  (accumulate cons seq2 seq1))
+
+(define (length sequence)
+  (accumulate (lambda (x y) (inc y)) 0 sequence))
+
+;;-------------
+;;EXERCISE 2.34
+;;-------------
+
+;;; Evaluating a polynomial in x at a given value of x can be
+;;; formulated as an accumulation. We evaluate the polynomial
+
+an r^n + an−1 r^n−1 + ... + a1 r + a0
+
+;; using Hroner's rule. We start with an, multiply by x, add an−1,
+;; multiply by x, and so on, until we reach a0.
+
+;;; Fill in the following template to produce a procedure that
+;;; evaluates a polynomial using Horner's rule. Assume that the
+;;; coefficients of the polynomial are arranged in a sequence, from a0
+;;; through an.
+
+(define (horner-eval x coefficient-sequence)
+  (accumulate (lambda (this-coeff higher-terms)
+                (+ this-coeff (* x higher-terms)))
+              0
+              coefficient-sequence))
+
+;;-------------
+;;EXERCISE 2.35
+;;-------------
+
+;;; Redefine count-leaves from section 2-2-2 as an accumulation:
+
+;; (define (count-leaves t)
+;;   (accumulate 'your 'answer (map 'your 'answer)))
+
+;;; This one will melt your brain.
+(define (count-leaves t)
+  (accumulate + 0 (map (lambda (element)
+                         (if (pair? element)
+                             (count-leaves element)
+                             1))
+                       t)))
+
+;;-------------
+;;EXERCISE 2.36
+;;-------------
+
+;;; The procedure accumulate-n is similar to accumulate except that it
+;;; takes as its third argument a sequence of sequences, which are all
+;;; assumed to have the same number of elements. It applies the
+;;; designated accumulation procedure to combine all the first
+;;; elements of the sequences, all the second elements of the
+;;; sequences, and so on, and returns a sequence of the results. For
+;;; instance, if s is a sequence containing four sequences, ((1 2 3)
+;;; (4 5 6) (7 8 9) (10 11 12)), then the value of (accumulate-n + 0
+;;; s) should be the sequence (22 26 30). Fill in the missing
+;;; expressions in the following definition of accumulate-n:
+
+;; (define (accumulate-n op init seqs)
+;;   (if (null? (car seqs))
+;;       nil
+;;       (cons (accumulate op init 'your-answer)
+;;             (accumulate-n op init 'your-answer))))
+
+(define (accumulate-n op init seqs)
+  (if (null? (car seqs))
+      nil
+      (cons (accumulate op init (map car seqs))
+            (accumulate-n op init (map cdr seqs)))))
+
+;;-------------
+;;EXERCISE 2.37
+;;-------------
+
+;;; Suppose we represent vectors v = (v_i) as sequences of numbers,
+;;; and matrices m = (m_(ij)) as sequences of vectors (the rows of the
+;;; matrix). For example, the matrix
+
+;; [ 1 2 3 4 ] 
+;; [ 4 5 6 6 ]
+;; [ 6 7 8 9 ]
+
+;;; is represented as the sequence ((1 2 3 4) (4 5 6 6) (6 7 8 9)).
+;;; With this representation, we can use sequence operations to
+;;; concisely express the basic matrix and vector operations. These
+;;; operations (which are described in any book on matrix algebra) are
+;;; the following:
+
+;; (dot-product v w) returns the sum_i vi wi
+;; (matrix-*-vector m w) returns the vector t, where ti = sum_j mij vj
+;; (matrix-*-matrix m n) returns the matrix p, where pij = sum_k mik nkj
+;; (transpose m) returns the matrix n, where nij  =  mji
+
+(define (dot-product v w)
+  (accumulate + 0 (map * v w)))
+
+;;; Without map:
+(define (dot-product v w)
+  (accumulate + 0
+              (accumulate-n * 1 (list v w))))
+
+;;; Fill in the missing expressions in the following procedures for
+;;; computing the other matrix operations. (The procedure accumulate-n
+;;; is defined in Exercise 2-36.)
+
+(define (matrix-*-vector m v)
+  (map (lambda (row)
+         (dot-product v row)) m))
+
+(define (transpose mat)
+  (accumulate-n cons nil mat))
+
+(define (matrix-*-matrix m n)
+  (let ((cols (transpose n)))
+    (map (lambda (row)
+           (map (lambda (col)
+                  (dot-product row col))
+                cols))
+         m)))
+
+;;; OR 
+
+(define (matrix-*-matrix m n)
+  (let ((cols (transpose n)))
+    (map (lambda (row)
+           (matrix-*-vector cols row))
+         m)))
