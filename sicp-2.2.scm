@@ -592,6 +592,10 @@
                                           (filter predicate (cdr sequence))))
         (else (filter predicate (cdr sequence)))))
 
+(define (enumerate-interval low high)
+  (if (> low high)
+      nil
+      (cons low (enumerate-interval (+ low 1) high))))
 
 (define (my-map p sequence)
   (accumulate (lambda (x y) (cons (p x) y)) nil sequence))
@@ -609,7 +613,7 @@
 ;;; Evaluating a polynomial in x at a given value of x can be
 ;;; formulated as an accumulation. We evaluate the polynomial
 
-an r^n + an−1 r^n−1 + ... + a1 r + a0
+;;; an r^n + an−1 r^n−1 + ... + a1 r + a0
 
 ;; using Hroner's rule. We start with an, multiply by x, add an−1,
 ;; multiply by x, and so on, until we reach a0.
@@ -719,10 +723,125 @@ an r^n + an−1 r^n−1 + ... + a1 r + a0
                 cols))
          m)))
 
-;;; OR 
+;;; The inner (map (lambda (col) ...) cols) is (matrix-*-vector cols row):
 
 (define (matrix-*-matrix m n)
   (let ((cols (transpose n)))
     (map (lambda (row)
            (matrix-*-vector cols row))
          m)))
+
+;;-------------
+;;EXERCISE 2.38
+;;-------------
+
+;;; The accumulate procedure is also known as fold-right, because it
+;;; combines the first element of the sequence with the result of
+;;; combining all the elements to the right. There is also a
+;;; fold-left, which is similar to fold-right, except that it combines
+;;; elements working in the opposite direction:
+
+(define (fold-left op initial sequence)
+  (define (iter result rest)
+    (if (null? rest)
+        result
+        (iter (op result (car rest))
+              (cdr rest))))
+  (iter initial sequence))
+
+;;; What are the values of
+
+(define fold-right accumulate)
+(fold-right / 1 (list 1 2 3))           ;3/2
+
+(fold-left / 1 (list 1 2 3))            ;1/6
+
+(fold-right list nil (list 1 2 3))      ;(1 (2 (3 ())))
+
+(fold-left list nil (list 1 2 3))       ;(((() 1) 2) 3)
+
+;;; Give a property that op should satisfy to guarantee that
+;;; fold-right and fold-left will produce the same values for any
+;;; sequence.
+
+;;; op is a two-argument procedure; it should be commutative:
+;;; (= (op y x) (op x y))
+
+(fold-right * 1 (list 1 2 3))
+(fold-left * 1 (list 1 2 3))
+
+;;-------------
+;;EXERCISE 2.39
+;;-------------
+
+;;; Complete the following definitions of reverse (Exercise 2-18) in
+;;; terms of fold-right and fold-left from Exercise 2-38:
+
+(define (reverse sequence)
+  (fold-right (lambda (x y) (append y (list x))) nil sequence))
+ 
+(define (reverse sequence)
+  (fold-left (lambda (x y) (cons y x)) nil sequence))
+
+(accumulate append
+            nil
+            (map (lambda (i)
+                   (map (lambda (j)
+                          (list i j))
+                        (enumerate-interval 1 (- i 1))))
+                 (enumerate-interval 1 6)))
+
+(define (flatmap proc seq)
+  (accumulate append nil (map proc seq)))
+
+(define (permutations s)
+  (if (null? s)
+      (list nil)
+      (flatmap (lambda (x)
+                 (map (lambda (p) (cons x p))
+                      (permutations (remove x s))))
+               s)))
+
+(define (remove x lst)
+  (filter (lambda (y) (not (= y x))) lst))
+
+;;-------------
+;;EXERCISE 2.40
+;;-------------
+
+;;; Define a procedure unique-pairs that, given an integer n,
+;;; generates the sequence of pairs (i,j) with 1≤j<i≤n. Use
+;;; unique-pairs to simplify the definition of prime-sum-pairs given
+;;; above.
+
+(define (unique-pairs n)
+  (flatmap (lambda (i)
+             (map (lambda (j) (list i j))
+                  (enumerate-interval 1 (- i 1))))
+           (enumerate-interval 1 n)))
+
+(define (prime-sum-pairs n)
+  (map make-pair-sum
+       (filter prime-sum?
+               (unique-pairs n))))
+
+;;-------------
+;;EXERCISE 2.41
+;;-------------
+
+;;; Write a procedure to find all ordered triples of distinct positive
+;;; integers i, j, and k less than or equal to a given integer n that
+;;; sum to a given integer s.
+
+
+(define (same-sum-triplets s N)
+  (define (unique-triplets n)
+    (flatmap (lambda (i)
+               (flatmap (lambda (j)
+                          (map (lambda (k) (list i j k))
+                               (enumerate-interval 1 (- j 1))))
+                        (enumerate-interval 1 (- i 1))))
+             (enumerate-interval 1 n)))
+  (define (sum-to-s? triplet)
+    (= (+ (car triplet) (cadr triplet) (caadr triplet)) s))
+  (filter sum-to-s? (unique-triplets N)))
