@@ -1,7 +1,15 @@
 ;;----------
 ;;PRIMITIVES
 ;;----------
+(define (inc x)  (+ x 1))
 (define nil '())
+(define identity (lambda (entity) entity))
+(define (deep-member? predicate k lst)
+  (cond ((null? lst) #f)
+        ((pair? (car lst)) (or (deep-member? predicate k (car lst))
+                               (deep-member? predicate k (cdr lst))))
+        ((predicate k (car lst)) #t)
+        (else (deep-member? predicate k (cdr lst)))))
 
 ;;-------------
 ;;EXERCISE 2.17
@@ -843,5 +851,169 @@
                         (enumerate-interval 1 (- i 1))))
              (enumerate-interval 1 n)))
   (define (sum-to-s? triplet)
-    (= (+ (car triplet) (cadr triplet) (caadr triplet)) s))
+    (= (+ (car triplet) (cadr triplet) (caddr triplet)) s))
+  
   (filter sum-to-s? (unique-triplets N)))
+
+;;-------------
+;;EXERCISE 2.42
+;;-------------
+
+;;; The ``eight-queens puzzle'' asks how to place eight queens on a
+;;; chessboard so that no queen is in check from any other (i.e., no
+;;; two queens are in the same row, column, or diagonal).
+
+;;; One way to solve the puzzle is to work across the board, placing a
+;;; queen in each column. Once we have placed k−1 queens, we must
+;;; place the kth queen in a position where it does not check any of
+;;; the queens already on the board. We can formulate this approach
+;;; recursively: Assume that we have already generated the sequence of
+;;; all possible ways to place k−1 queens in the first k−1 columns of
+;;; the board. For each of these ways, generate an extended set of
+;;; positions by placing a queen in each row of the kth column. Now
+;;; filter these, keeping only the positions for which the queen in
+;;; the kth column is safe with respect to the other queens. This
+;;; produces the sequence of all ways to place k queens in the first k
+;;; columns. By continuing this process, we will produce not only one
+;;; solution, but all solutions to the puzzle.
+
+;;; We implement this solution as a procedure queens, which returns a
+;;; sequence of all solutions to the problem of placing n queens on an
+;;; n x n chessboard. queens has an internal procedure queen-cols that
+;;; returns the sequence of all ways to place queens in the first k
+;;; columns of the board.
+
+(define (queens board-size)
+  (define (queen-cols k)
+    (if (= k 0)
+        (list empty-board)
+        (filter
+         (lambda (positions) (safe? k positions))
+         (flatmap
+          (lambda (rest-of-queens)
+            (map (lambda (new-row)
+                   (adjoin-position new-row k rest-of-queens))
+                 (enumerate-interval 1 board-size)))
+          (queen-cols (- k 1))))))
+  (queen-cols board-size))
+
+(define (queens board-size)
+  (define (queen-cols k)
+    (if (= k 0)
+        (list empty-board)
+        (filter
+         (lambda (positions) (safe? k positions))
+         (flatmap
+          (lambda (new-row)
+            (map (lambda (rest-of-queens)
+                   (adjoin-position new-row k rest-of-queens))
+                 (queen-col)))
+          (lambda (rest-of-queens)
+            (map (lambda (new-row)
+                   (adjoin-position new-row k rest-of-queens))
+                 (enumerate-interval 1 board-size)))
+          (queen-cols (- k 1))))))
+  (queen-cols board-size))
+
+;;; In this procedure rest-of-queens is a way to place k−1 queens in
+;;; the first k−1 columns, and new-row is a proposed row in which to
+;;; place the queen for the kth column. Complete the program by
+;;; implementing the representation for sets of board positions,
+;;; including the procedure adjoin-position, which adjoins a new
+;;; row-column position to a set of positions, and empty-board, which
+;;; represents an empty set of positions. You must also write the
+;;; procedure safe?, which determines for a set of positions, whether
+;;; the queen in the kth column is safe with respect to the others.
+;;; (Note that we need only check whether the new queen is safe---the
+;;; other queens are already guaranteed safe with respect to each
+;;; other.)
+
+;;; The queens procedure does not make any assumptions about the data
+;;; structure being used to hold a k-queen configuration. (Which is
+;;; fantastic.) So here's a simple data structure that works for (say)
+;;; a 5x5 board:
+
+;;; rows (4 2 5 3 1)
+;;;       ^
+;;; cols  1 2 3 4 5 
+
+;;; rows is a list of queen positions, the nth entry of which refers
+;;; to a queen at ((nth rows n), n). The empty board is just '().
+
+;;; Adjoining a queen to the list (for a 6x6 board) is done by consing
+;;; a row position to the list:
+
+;;; rows (cons 6 (4 2 5 3 1))
+;;;      (6 4 2 3 5 1)
+;;; cols  1 2 3 4 5 6      
+
+;;; The configuration is valid if the queen at (1,6) is safe from the
+;;; other queens' row or diagonal attacks. We don't need to check for
+;;; attacks from the same column because the column index will be
+;;; unique by definition.
+
+(define (adjoin-position new-row k rest-of-queens)
+  (cons new-row rest-of-queens))
+
+(define empty-board nil)
+
+(define (safe? k positions)
+  (define (safe-kth? kth row-distance rest)
+    (or (null? rest)
+        (let ((next-queen-row (car rest)))
+          (and  (not (= kth next-queen-row))
+                (not (= (abs (- kth next-queen-row))
+                        row-distance))
+                (safe-kth? kth (+ row-distance 1) (cdr rest))))))
+  (safe-kth? (car positions) 1 (cdr positions)))
+
+;;; The above definitions do not need k at all. Here's a different,
+;;; simpler (but equivalent) definition of safe? that does.
+
+(define (safe? k positions)
+  (let ((kth-queen (car positions))
+        (rest-of-queens (cdr positions))
+        (one-to-k (enumerate-interval 1 (- k 1))))
+    (not (member kth-queen
+                 (flatmap identity
+                          (list rest-of-queens
+                                (map - rest-of-queens one-to-k)
+                                (map + rest-of-queens one-to-k)))))))
+
+
+
+(define (transformed? rows next)
+  ;; 90 deg
+  ;; 180 deg
+  ;; 270 deg
+  ;; flip horiz
+  ;; flip ver
+
+  (define (flip-ver r) (map (lambda (x) (- 9 x)) r))
+  (define rot180 (compose reverse flip-ver))
+  (or (equal? next (flip-ver rows))
+      (equal? next (rot180 rows))))
+
+(define (uniquify positions)
+  (accumulate (lambda (rows uniqued)
+                (cons rows
+                      (filter (lambda (pos)
+                                (not (transformed? rows pos)))
+                              uniqued)))
+              nil
+              positions))
+
+
+  (let ((rows '(5 7 2 6 3 1 4 8)))
+    (let ((pairs (map (lambda (coord)
+                        (list (cdr coord) (- 9 (car coord))))
+                      (map cons (enumerate-interval 1 8) rows)))
+          (one-to-k (enumerate-interval 1 8)))
+      pairs))
+
+
+
+(define (arrange-cdrwise lst idx)
+  (if (null? lst)
+      nil
+      ))
