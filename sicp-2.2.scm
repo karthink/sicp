@@ -5,6 +5,30 @@
 (define (inc x)  (+ x 1))
 (define nil '())
 (define identity (lambda (entity) entity))
+
+;;; sequence operations
+(define (accumulate op initial sequence)
+  (if (null? sequence)
+      initial
+      (op (car sequence) (accumulate op initial (cdr sequence)))))
+
+(define (filter predicate sequence)
+  (cond ((null? sequence) nil)
+        ((predicate (car sequence)) (cons (car sequence)
+                                          (filter predicate (cdr sequence))))
+        (else (filter predicate (cdr sequence)))))
+
+(define (accumulate-n op init seqs)
+  (if (null? (car seqs))
+      nil
+      (cons (accumulate op init (map car seqs))
+            (accumulate-n op init (map cdr seqs)))))
+
+(define (enumerate-interval low high)
+  (if (> low high)
+      nil
+      (cons low (enumerate-interval (+ low 1) high))))
+
 (define (deep-member? predicate k lst)
   (cond ((null? lst) #f)
         ((pair? (car lst)) (or (deep-member? predicate k (car lst))
@@ -12,6 +36,8 @@
         ((predicate k (car lst)) #t)
         (else (deep-member? predicate k (cdr lst)))))
 
+(define (flatmap proc seq)
+  (accumulate append nil (map proc seq)))
 ;;-------------
 ;;EXERCISE 2.17
 ;;-------------
@@ -1037,3 +1063,262 @@
                               uniqued)))
               nil
               positions))
+
+;;-------------
+;;EXERCISE 2.43
+;;-------------
+
+;;; Louis Reasoner is having a terrible time doing Exercise 2-42. His
+;;; queens procedure seems to work, but it runs extremely slowly.
+;;; (Louis never does manage to wait long enough for it to solve even
+;;; the 6×6 case.) When Louis asks Eva Lu Ator for help, she points
+;;; out that he has interchanged the order of the nested mappings in
+;;; the flatmap, writing it as
+
+(flatmap
+ (lambda (new-row)
+   (map (lambda (rest-of-queens)
+          (adjoin-position new-row k rest-of-queens))
+        (queen-cols (- k 1))))
+ (enumerate-interval 1 board-size))
+
+;;; Explain why this interchange makes the program run slowly.
+;;; Estimate how long it will take Louis's program to solve the
+;;; eight-queens puzzle, assuming that the program in Exercise 2-42
+;;; solves the puzzle in time T.
+
+;;; The original code calls (queen-cols (- k 1)) exactly once for each
+;;; k. Louis' code calls it board-size times. Let the board size be B.
+;;; The amount of time it takes:
+
+;; (queens N) calls (queen-cols N), which
+;; calls (queen-cols (- N 1)) B times, each invocation of which
+;; calls (queen-cols (- N 2)) B times, each invocation of which
+;; calls (queen-cols (- N 3)) B times, and so on.
+;; 
+;; The total time taken is multiplied by a factor of:
+;; 1 + B + B^2 + B^3 + ... B^N = (B^ (N+1) - 1) / (B - 1) ~ B^N = B^B,
+;; since the board size equals the number of queens when queens is called.
+
+
+;;------------------
+;;A PICTURE LANGUAGE
+;;------------------
+
+;;-------------
+;;EXERCISE 2.44
+;;-------------
+
+;;; Define the procedure up-split used by corner-split. It is similar
+;;; to right-split, except that it switches the roles of below and
+;;; beside.
+
+(define (up-split painter n)
+  (if (= n 0)
+      painter
+      (let ((smaller (up-split painter (- n 1))))
+        (below painter (beside smaller smaller)))))
+
+;;-------------
+;;EXERCISE 2.45
+;;-------------
+
+;;; right-split and up-split can be expressed as instances of a
+;;; general splitting operation. Define a procedure split with the
+;;; property that evaluating
+
+(define right-split (split beside below))
+(define up-split (split below beside))
+
+(define (split op1 op2)
+  (lambda (painter n)
+    (if (= n 0)
+        painter
+        (let ((smaller ((split op1 op2) painter (- n 1))))
+          (op1 painter (op2 smaller smaller))))))
+
+;;-------------
+;;EXERCISE 2.46
+;;-------------
+
+;;; A two-dimensional vector v running from the origin to a point can
+;;; be represented as a pair consisting of an x-coordinate and a
+;;; y-coordinate. Implement a data abstraction for vectors by giving a
+;;; constructor make-vect and corresponding selectors xcor-vect and
+;;; ycor-vect. In terms of your selectors and constructor, implement
+;;; procedures add-vect, sub-vect, and scale-vect that perform the
+;;; operations vector addition, vector subtraction, and multiplying a
+;;; vector by a scalar:
+
+;;; Primitives:
+(define (make-vect x y) (cons x y))
+(define (xcor-vect v) (car v))
+(define (ycor-vect v) (cdr v))
+
+;;; Operations
+(define (combine-vect operation)
+  (lambda (v1 v2)
+    (make-vect (operation (xcor-vect v1)
+                          (xcor-vect v2))
+               (operation (ycor-vect v1)
+                          (ycor-vect v2)))))
+
+(define add-vect (combine-vect +))
+(define sub-vect (combine-vect -))
+
+(define (scale-vect s v)
+  (make-vect (* s (xcor-vect v))
+             (* s (ycor-vect v))))
+;;-------------
+;;EXERCISE 2.47
+;;-------------
+
+;;; Here are two possible constructors for frames:
+
+(define (make-frame origin edge1 edge2)
+  (list origin edge1 edge2))
+ 
+(define (make-frame origin edge1 edge2)
+  (cons origin (cons edge1 edge2)))
+
+;;; For each constructor supply the appropriate selectors to produce
+;;; an implementation for frames.
+
+;;; Selectors are origin-frame, edge1-frame and edge2-frame
+;;; This works for both representations
+(define (origin-frame frame)
+  (car frame))
+(define (edge1-frame frame) (cadr frame))
+
+;;; This doesn't. First representation:
+(define (edge2-frame frame) (caddr frame))
+
+;;; Second representation:
+(define (edge2-frame frame) (cddr frame))
+
+;;-------------
+;;EXERCISE 2.48
+;;-------------
+
+;;; A directed line segment in the plane can be represented as a pair
+;;; of vectors---the vector running from the origin to the start-point
+;;; of the segment, and the vector running from the origin to the
+;;; end-point of the segment. Use your vector representation from
+;;; Exercise 2-46 to define a representation for segments with a
+;;; constructor make-segment and selectors start-segment and
+;;; end-segment.
+
+(define (make-segment v1 v2) (cons v1 v2))
+(define (start-segment segment) (car segment))
+(define (end-segment segment) (cdr segment))
+
+
+;;-------------
+;;EXERCISE 2.49
+;;-------------
+
+;;; Use segments->painter to define the following primitive painters:
+
+(define (segments->painter segment-list)
+  (lambda (frame)
+    (for-each
+     (lambda (segment)
+       (draw-line
+        ((frame-coord-map frame) (start-segment segment))
+        ((frame-coord-map frame) (end-segment segment))))
+     segment-list)))
+
+(let ((orig (make-vect 0 0))
+      (x1y0 (make-vect 1 0))
+      (x0y1 (make-vect 0 1))
+      (x1y1 (make-vect 1 1)))
+;;; The painter that draws the outline of the designated frame.
+  (segments->painter (list (make-segment orig x1y0)
+                           (make-segment x1y0 x1y1)
+                           (make-segment x1y1 x0y1)
+                           (make-segment x0y1 orig)))
+
+;;; The painter that draws an ``X'' by connecting opposite corners of
+;;; the frame.
+  (segments->painter (list (make-segment orig x1y1)
+                           (make-segment x0y1 x1y0))))
+
+;;; The painter that draws a diamond shape by connecting the midpoints
+;;; of the sides of the frame.
+;;; This is tiresome
+;; (segments->painter (list (make-segment (scale-vect 0.5 x1y0)
+;;                                        (scale-vect 0.5 x0y1))
+;;                          (make-segment (scale-vect 0.5 x1y0)
+;;                                        (scale-vect 0.5 x1y1))
+;;                          (make-segment (scale-vect 0.5 x1y0)
+;;                                        (scale-vect 0.5 x1y1))
+;;                          (make-segment (scale-vect 0.5 x1y0)
+;;                                        (scale-vect 0.5 x0y1))))
+
+;;; The wave painter.
+;;; WAT
+
+;;-------------
+;;EXERCISE 2.50
+;;-------------
+
+;;; Define the transformation flip-horiz, which flips painters
+;;; horizontally, and transformations that rotate painters
+;;; counterclockwise by 180 degrees and 270 degrees.
+
+(define (flip-hoiz painter)
+  (transform-painter painter (make-vect 1.0 0.0)
+                     (make-vect 0.0 0.0)
+                     (make-vect 0.0 1.0)))
+
+(define (rotate180 painter)
+  (tranform-painter painter (make-vect 1.0 1.0)
+                    (make-vect 0.0 1.0)
+                    (make-vect 1.0 0.0)))
+
+(define (rotate270 painter)
+  (compose rotate90 rotate 180))
+
+;;-------------
+;;EXERCISE 2.51
+;;-------------
+
+;;; Define the below operation for painters. Below takes two painters
+;;; as arguments. The resulting painter, given a frame, draws with the
+;;; first painter in the bottom of the frame and with the second
+;;; painter in the top. Define below in two different ways---first by
+;;; writing a procedure that is analogous to the beside procedure
+;;; given above, and again in terms of beside and suitable rotation
+;;; operations (from Exercise 2-50).
+
+(define (below painter1 painter2)
+  (let ((split-point (make-vect 0.0 0.5)))
+    (let ((paint-left
+           (transform-painter painter1
+                              (make-vect 0.0 0.0)
+                              split-point
+                              (make-vect 1.0 0.0)))
+          (paint-right
+           (transform-painter painter2
+                              split-point
+                              (make-vect 0.0 1.0)
+                              (make-vect 1.0 0.5))))
+      (lambda (frame)
+        (paint-left frame)
+        (paint-right frame)))))
+  
+(define (below painter1 painter2)
+  (rotate270 (beside (rotate90 painter1) (rotate90 painter2))))
+
+;;-------------
+;;EXERCISE 2.52
+;;-------------
+;;; Skipped
+
+
+;;---------------------------------------------------------------
+;;SYMBOLIC DATA
+;;---------------------------------------------------------------
+
+
+
