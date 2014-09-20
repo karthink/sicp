@@ -1,6 +1,7 @@
 ;;----------
 ;;PRIMITIVES
 ;;----------
+(define (compose f g) (lambda (x) ( f (g x))))
 (define (inc x)  (+ x 1))
 (define nil '())
 (define identity (lambda (entity) entity))
@@ -897,23 +898,23 @@
           (queen-cols (- k 1))))))
   (queen-cols board-size))
 
-(define (queens board-size)
-  (define (queen-cols k)
-    (if (= k 0)
-        (list empty-board)
-        (filter
-         (lambda (positions) (safe? k positions))
-         (flatmap
-          (lambda (new-row)
-            (map (lambda (rest-of-queens)
-                   (adjoin-position new-row k rest-of-queens))
-                 (queen-col)))
-          (lambda (rest-of-queens)
-            (map (lambda (new-row)
-                   (adjoin-position new-row k rest-of-queens))
-                 (enumerate-interval 1 board-size)))
-          (queen-cols (- k 1))))))
-  (queen-cols board-size))
+;; (define (queens board-size)
+;;   (define (queen-cols k)
+;;     (if (= k 0)
+;;         (list empty-board)
+;;         (filter
+;;          (lambda (positions) (safe? k positions))
+;;          (flatmap
+;;           (lambda (new-row)
+;;             (map (lambda (rest-of-queens)
+;;                    (adjoin-position new-row k rest-of-queens))
+;;                  (queen-col)))
+;;           (lambda (rest-of-queens)
+;;             (map (lambda (new-row)
+;;                    (adjoin-position new-row k rest-of-queens))
+;;                  (enumerate-interval 1 board-size)))
+;;           (queen-cols (- k 1))))))
+;;   (queen-cols board-size))
 
 ;;; In this procedure rest-of-queens is a way to place k−1 queens in
 ;;; the first k−1 columns, and new-row is a proposed row in which to
@@ -967,8 +968,8 @@
                 (safe-kth? kth (+ row-distance 1) (cdr rest))))))
   (safe-kth? (car positions) 1 (cdr positions)))
 
-;;; The above definitions do not need k at all. Here's a different,
-;;; simpler (but equivalent) definition of safe? that does.
+;;; The above definitions do not actually need k at all. Here's a
+;;; different, simpler (but equivalent) definition of safe? that does.
 
 (define (safe? k positions)
   (let ((kth-queen (car positions))
@@ -981,18 +982,52 @@
                                 (map + rest-of-queens one-to-k)))))))
 
 
+;;; Many of the possible solutions to the k-queens problem are
+;;; transformations of each other. The same position corresponds to
+;;; four positions when viewed from each side of the chess board as a
+;;; base. There are four more transformations corresponding to the
+;;; reverse of these, and even more from mirror images (which
+;;; correspond to a rotation and a reversal, so they're taken care
+;;; of.)
+
+;;; Here is a function (uniquify) that eliminates all
+;;; duplicates/transforms from a list of solutions and returns only
+;;; truly unique ones. When applied to (queens 8), it reduces the
+;;; number of solutions from 92 to 14.
 
 (define (transformed? rows next)
-  ;; 90 deg
-  ;; 180 deg
-  ;; 270 deg
-  ;; flip horiz
-  ;; flip ver
+  (define (flip r) (map (lambda (x) (- 9 x)) r))
+  
+  (define (rot90 rows) 
+    (define (arrange-cdrwise lst idx)
+      (define (careql? pr)
+        (= (car pr) idx))
+      (if (> idx 8)
+          nil
+          (cons (car (filter careql? lst))
+                (arrange-cdrwise (filter (compose not careql?) lst)
+                                 (+ idx 1)))))
+    (let ((pairs (map (lambda (coord)
+                        (list (cdr coord) (- 9 (car coord))))
+                      (map cons (enumerate-interval 1 8) rows)))
+          (one-to-k (enumerate-interval 1 8)))
+      (map cadr (arrange-cdrwise pairs 1))))
+  
+  (define rot180 (compose reverse flip))
+  
+  (define rot270 (compose rot180 rot90))
+  
+  (let ((row-flip (flip rows))
+        (row-rot180 (rot180 rows))
+        (row-rot90 (rot90 rows))
+        (row-rot270 (rot270 rows)))
 
-  (define (flip-ver r) (map (lambda (x) (- 9 x)) r))
-  (define rot180 (compose reverse flip-ver))
-  (or (equal? next (flip-ver rows))
-      (equal? next (rot180 rows))))
+    (accumulate (lambda (x y) (or x y))
+                #f
+                (map (lambda (tr) (equal? next tr))
+                     (list row-flip row-rot180
+                           row-rot90 row-rot270
+                           (reverse row-rot90) (reverse row-rot270))))))
 
 (define (uniquify positions)
   (accumulate (lambda (rows uniqued)
@@ -1002,18 +1037,3 @@
                               uniqued)))
               nil
               positions))
-
-
-  (let ((rows '(5 7 2 6 3 1 4 8)))
-    (let ((pairs (map (lambda (coord)
-                        (list (cdr coord) (- 9 (car coord))))
-                      (map cons (enumerate-interval 1 8) rows)))
-          (one-to-k (enumerate-interval 1 8)))
-      pairs))
-
-
-
-(define (arrange-cdrwise lst idx)
-  (if (null? lst)
-      nil
-      ))
