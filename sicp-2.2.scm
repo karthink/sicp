@@ -1534,4 +1534,57 @@
 ;;;     selectors, and constructors for this notation such that our
 ;;;     derivative program still works?
 
+;;; The first part is straightforward:
 
+(define (sum? x) (eq? '+ (cadr x)))
+(define (product? x) (eq? '* (cadr x)))
+(define (exponentiation? x) (eq? '** (cadr x)))
+
+(define (addend x) (car x))
+(define (augend x) (caddr x))
+
+(define (multiplier x) (car x))
+(define (multiplicand x) (caddr x))
+
+(define (base x) (car x))
+(define (exponent x) (caddr x))
+
+(define (make-sum a1 a2)
+  (cond ((=number? a1 0) a2)
+        ((=number? a2 0) a1)
+        ((and (number? a1) (number? a2)) (+ a1 a2))
+        (else (list a1 '+ a2))))
+
+(define (make-product m1 m2)
+  (cond ((or (=number? m1 0) (=number? m2 0)) 0)
+        ((=number? m1 1) m2)
+        ((=number? m2 1) m1)
+        ((and (number? m1) (number? m2)) (* m1 m2))
+        (else (list m1 '* m2))))
+
+(define (make-exponentiation base exponent)
+  (if (or (=number? base 1) (=number? exponent 0))
+      1
+      (list base '** exponent)))
+
+;;; Done
+
+;;; The second part is tricky. Without dealing with the precedence of
+;;; * over +, we can use the augend and multiplicand functions for
+;;; multi-argument sums and products from before:
+
+(define (augend x)
+  (let ((rest (cddr x)))
+    (if (null? (cdr rest)) (car rest) rest)))
+
+(define (multiplicand x)
+  (let ((rest (cddr x)))
+    (if (null? (cdr rest)) (car rest) rest)))
+
+;;; Now we add the sum? function.
+
+(define (sum? x)
+  (memq '+ x))
+
+(define (product? x)
+  (memq '* x))
