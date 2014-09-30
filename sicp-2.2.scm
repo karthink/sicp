@@ -1410,6 +1410,7 @@
 
 (define (=number? exp num)
   (and (number? exp) (= exp num)))
+
 (define (make-sum a1 a2)
   (cond ((=number? a1 0) a2)
         ((=number? a2 0) a1)
@@ -1522,17 +1523,17 @@
 ;;; the representation of the algebraic expressions on which the
 ;;; differentiator is to operate.
 
-;;;     Show how to do this in order to differentiate algebraic
+;;;     1. Show how to do this in order to differentiate algebraic
 ;;;     expressions presented in infix form, such as (x + (3 * (x + (y
 ;;;     + 2)))). To simplify the task, assume that + and * always take
 ;;;     two arguments and that expressions are fully parenthesized.
 
-;;;     The problem becomes substantially harder if we allow standard
-;;;     algebraic notation, such as (x + 3 * (x + y + 2)), which drops
-;;;     unnecessary parentheses and assumes that multiplication is
-;;;     done before addition. Can you design appropriate predicates,
-;;;     selectors, and constructors for this notation such that our
-;;;     derivative program still works?
+;;;     2. The problem becomes substantially harder if we allow
+;;;     standard algebraic notation, such as (x + 3 * (x + y + 2)),
+;;;     which drops unnecessary parentheses and assumes that
+;;;     multiplication is done before addition. Can you design
+;;;     appropriate predicates, selectors, and constructors for this
+;;;     notation such that our derivative program still works?
 
 ;;; The first part is straightforward:
 
@@ -1571,20 +1572,89 @@
 
 ;;; The second part is tricky. Without dealing with the precedence of
 ;;; * over +, we can use the augend and multiplicand functions for
-;;; multi-argument sums and products from before:
+;;; multi-argument sums and products from before, with these two
+;;; helper procedures:
 
-(define (augend x)
-  (let ((rest (cddr x)))
-    (if (null? (cdr rest)) (car rest) rest)))
+;;; Return elements of a list in sequence until first occurrence of
+;;; sym
+(define (until-symbol sym lst)
+  (if (eq? sym (car lst))
+      nil
+      (cons (car lst)
+            (until-symbol sym (cdr lst)))))
 
-(define (multiplicand x)
-  (let ((rest (cddr x)))
-    (if (null? (cdr rest)) (car rest) rest)))
+;;; If list has one element, return the element
+(define (single-element lst)
+  (cond ((null? lst) lst)
+        ((null? (cdr lst)) (car lst))
+        (else lst)))
 
-;;; Now we add the sum? function.
+;;; The following works by evaluating the expression from left to
+;;; right with no regard for precedence:
+;;; ----------------
+(define (sum? x) (eq? '+ (cadr x)))
+(define (product? x) (eq? '* (cadr x)))
 
-(define (sum? x)
-  (memq '+ x))
+(define (addend x) (car x))
+(define (augend x) (single-element (cddr x)))
 
-(define (product? x)
-  (memq '* x))
+(define (multiplicand x) (single-element (cddr x)))
+(define (multiplier x) (car x))
+;;; ----------------
+
+;;; The problem is that deriv assumes the expression is a product if
+;;; the second element is '* and sum if it's '+. But an expression like
+
+;;; (3 * x + 4 * y) 
+
+;;; is actually a sum of two terms, 3x and 4y, not a product of three.
+
+;;; deriv checks for sum? before product?, so if we identify sum? and
+;;; product? correctly (along with the correct addends/augends etc),
+;;; the procedure should work automatically for arbitrary algebraic
+;;; expressions.
+
+;;; We can do this by (i) regarding an expression as a sum if there's
+;;; a '+ anywhere in the list. (Ditto for product)
+(define (sum? x) (memq '+ x))
+(define (product? x) (memq '* x))
+
+;;; and (ii) capturing everything until that '+ as addend and
+;;; everything after as augend
+(define (addend x) (single-element (until-symbol '+ x)))
+(define (augend x) (single-element (cdr (memq '+ x))))
+
+(define (multiplier x) (single-element (until-symbol '* x)))
+(define (multiplicand x) (single-element (cdr (memq '* x))))
+
+;;; Check:
+(deriv '(x * 3 + y + 4 * x ) 'x)        ;7
+(deriv '(7 + (x ** 4) * y + 5) 'x)      ;((4 * (x ** 3)) * y)
+(deriv '(x + 3 * (x + y + 2)) 'x)       ;4
+
+;;-----------------
+;;REPRESENTING SETS
+;;-----------------
+
+(define (intersection-set set1 set2)
+  (cond ((or (null? set1) (null? set2)) '())
+        ((element-of-set (car set1) set2)
+         (cons (car set1) (intersection-set (cdr set1) set2)))
+        (else (intersection-set (cdr set1) set2))))
+
+;;-------------
+;;EXERCISE 2.59
+;;-------------
+
+;;; Implement the union-set operation for the unordered-list
+;;; representation of sets.
+
+(define (union-set set1 set2)
+  (cond ((null? set1) set2)
+        ((null? set2) set1)
+        ((element-of-set (car set1) set2) (union-set (cdr set1) set2))
+        (else (cons (car set1) (union-set (cdr set1) set2)))))
+
+
+
+
