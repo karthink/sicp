@@ -1655,6 +1655,143 @@
         ((element-of-set (car set1) set2) (union-set (cdr set1) set2))
         (else (cons (car set1) (union-set (cdr set1) set2)))))
 
+;;-------------
+;;EXERCISE 2.60
+;;-------------
 
+;;; We specified that a set would be represented as a list with no
+;;; duplicates. Now suppose we allow duplicates. For instance, the set
+;;; {1,2,3} could be represented as the list (2 3 2 1 3 2 2). Design
+;;; procedures element-of-set?, adjoin-set, union-set, and
+;;; intersection-set that operate on this representation. How does the
+;;; efficiency of each compare with the corresponding procedure for
+;;; the non-duplicate representation? Are there applications for which
+;;; you would use this representation in preference to the
+;;; non-duplicate one?
+
+;;; element-of-set? is the same.
+(define (element-of-set? x set)
+  (cond ((null? set) #f)
+        ((equal? x (car set)) #t)
+        (else (element-of-set? x (cdr set)))))
+
+(define (adjoin-set x set)  (cons x set))
+
+(define (union-set set1 set2) (append set1 set2))
+
+;;; intersection-set is also the same
+(define (intersection-set set1 set2)
+  (cond ((or (null? set1) (null? set2)) '())
+        ((element-of-set (car set1) set2)
+         (cons (car set1)
+               (intersection-set (cdr set1) set2)))))
+
+;;; Order of complexity for a set of size ~n:
+;;; element-of-set? O(n)
+;;; adjoin-set O(1)
+;;; union-set O(n)
+;;; intersection-set O(n^2)
+
+;;; adjoin-set and union-set are more efficient, but sets can take
+;;; much more memory.
+
+;;; Applications...?
+
+;;-------------
+;;EXERCISE 2.61
+;;-------------
+
+;;; Give an implementation of adjoin-set using the ordered
+;;; representation. By analogy with element-of-set? show how to take
+;;; advantage of the ordering to produce a procedure that requires on
+;;; the average about half as many steps as with the unordered
+;;; representation.
+
+(define (adjoin-set x set)
+  (cond ((null? set) false)
+        ((= x (car set)) set)
+        ((< x (car set)) (cons x set))
+        (else (cons (car set) (adjoin-set x (cdr set))))))
+
+;;-------------
+;;EXERCISE 2.62
+;;-------------
+
+;;; Give a Θ(n) implementation of union-set for sets represented as
+;;; ordered lists.
+
+(define (union-set set1 set2)
+  (cond ((null? set1) set2)
+        ((null? set2) set1)
+        (else (let ((x1 (car set1)) (x2 (car set2)))
+                (cond ((= x1 x2)
+                       (cons x1 (union-set (cdr set1) (cdr set2))))
+                      ((< x1 x2)
+                       (cons x1 (union-set (cdr set1) set2)))
+                      ((< x2 x1)
+                       (cons x2 (union-set set1 (cdr set2)))))))))
+;;-------------
+;;EXERCISE 2.63
+;;-------------
+
+;;; Each of the following two procedures converts a binary tree to a
+;;; list.
+
+(define (tree->list-1 tree)
+  (if (null? tree)
+      '()
+      (append (tree->list-1 (left-branch tree))
+              (cons (entry tree)
+                    (tree->list-1 (right-branch tree))))))
+ 
+(define (tree->list-2 tree)
+  (define (copy-to-list tree result-list)
+    (if (null? tree)
+        result-list
+        (copy-to-list (left-branch tree)
+                      (cons (entry tree)
+                            (copy-to-list (right-branch tree)
+                                          result-list)))))
+  (copy-to-list tree '()))
+
+;;; Do the two procedures produce the same result for every tree? If
+;;; not, how do the results differ? What lists do the two procedures
+;;; produce for the trees in Figure 2-16?
+
+;;; Do the two procedures have the same order of growth in the number
+;;; of steps required to convert a balanced tree with n elements to a
+;;; list? If not, which one grows more slowly?
+
+(define (entry tree) (car tree))
+
+(define (left-branch tree) (cadr tree))
+
+(define (right-branch tree) (caddr tree))
+
+(define (make-tree entry left right)
+  (list entry left right))
+
+(define t1 (make-tree 7
+                      (make-tree 3
+                                 (make-tree 1 '() '())
+                                 (make-tree 5 '() '()))
+                      (make-tree 9
+                                 '()
+                                 (make-tree 11 '() '()))))
+(define t2 (make-tree 3
+                      (make-tree 1 '() '())
+                      (make-tree 7
+                                 (make-tree 5 '() '())
+                                 (make-tree 9
+                                            '()
+                                            (make-tree 11 '() '())))))
+
+(define t3 (make-tree 5
+                      (make-tree 3
+                                 (make-tree 1 '() '())
+                                 '())
+                      (make-tree 9
+                                 (make-tree 7 '() '())
+                                 (make-tree 11 '() '()))))
 
 
