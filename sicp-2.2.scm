@@ -2017,3 +2017,39 @@
 ;;; certainly doing something wrong. You can take significant
 ;;; advantage of the fact that we are using an ordered set
 ;;; representation.)
+
+(define (adjoin-set x set)
+  (cond ((null? set) (list x))
+        ((< (weight x) (weight (car set))) (cons x set))
+        (else (cons (car set)
+                    (adjoin-set x (cdr set))))))
+
+(define (make-leaf-set pairs)
+  (if (null? pairs)
+      '()
+      (let ((pair (car pairs)))
+        (adjoin-set (make-leaf (car pair)    ; symbol
+                               (cadr pair))  ; frequency
+                    (make-leaf-set (cdr pairs))))))
+
+(define (generate-huffman-tree pairs)
+  (successive-merge (make-leaf-set pairs)))
+
+(define (successive-merge pairs)
+  (if (null? (cdr pairs))
+      pairs
+      (successive-merge (adjoin-set (make-code-tree (car pairs)
+                                                    (cadr pairs))
+                                    (cddr pairs)))))
+
+;;; OR
+
+;; (define (test-merge pairs)
+;;   (accumulate make-code-tree nil (reverse pairs)))
+
+(generate-huffman-tree '((A 4) (B 2) (C 1) (D 1)))
+
+(generate-huffman-tree '(( A     2) ( NA   16)
+                        ( BOOM  1) ( SHA  3)
+                        ( GET   2) ( YIP  9)
+                        ( JOB   2) ( WAH  1)))
