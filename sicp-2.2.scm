@@ -1795,3 +1795,225 @@
                                  (make-tree 11 '() '()))))
 
 
+;;; Both functions return the same list for all trees above.
+
+;;; Order of growth:
+
+;;; On a balanced tree of size n, tree->list-1 runs twice on two
+;;; balanced trees of size n/2. The append function is O(n/2). So T(n)
+;;; = 2 T(n/2) + O(n/2). 
+
+;;; On a balanced tree of size n, tree->list-2 runs twice on two
+;;; balanced trees of size n/2. The only other operation is cons. So
+;;; T(n) = 2 T(n/2) + O(1), so T(n) = O(n). This grows more slowly.
+
+;;-------------
+;;EXERCISE 2.64
+;;-------------
+
+;;; The following procedure list->tree converts an ordered list to a
+;;; balanced binary tree. The helper procedure partial-tree takes as
+;;; arguments an integer n and list of at least n elements and
+;;; constructs a balanced tree containing the first n elements of the
+;;; list. The result returned by partial-tree is a pair (formed with
+;;; cons) whose car is the constructed tree and whose cdr is the list
+;;; of elements not included in the tree.
+
+(define (list->tree elements)
+  (car (partial-tree elements (length elements))))
+
+(define (partial-tree elts n)
+  (if (= n 0)
+      (cons '() elts)
+      (let ((left-size (quotient (- n 1) 2)))
+        (let ((left-result (partial-tree elts left-size)))
+          (let ((left-tree (car left-result))
+                (non-left-elts (cdr left-result))
+                (right-size (- n (+ left-size 1))))
+            (let ((this-entry (car non-left-elts))
+                  (right-result (partial-tree (cdr non-left-elts)
+                                              right-size)))
+              (let ((right-tree (car right-result))
+                    (remaining-elts (cdr right-result)))
+                (cons (make-tree this-entry left-tree right-tree)
+                      remaining-elts))))))))
+
+;;; Write a short paragraph explaining as clearly as you can how
+;;; partial-tree works. Draw the tree produced by list->tree for the
+;;; list (1 3 5 7 9 11).
+
+;;; What is the order of growth in the number of steps required by
+;;; list->tree to convert a list of n elements?
+
+;;; Given a list of n elements, partial-tree recurses on the first
+;;; (n-1)/2 elements to produce a balanced left sub-tree. The middle
+;;; element becomes the tree-entry, and partial-tree recurses on the
+;;; remaining elements to construct the right sub-tree.
+
+;;; Order of growth: A call to partial-tree on a list of size n
+;;; involves two calls to partial-tree on lists of size n/2.
+;;; Everything else is a O(1) operation except for length (in
+;;; list->tree), which is an O(n) operation. So T(n) = 2 T(n/2) +
+;;; O(n), so the operation is n log(n).
+
+;;-------------
+;;EXERCISE 2.65
+;;-------------
+
+;;; Use the results of Exercise 2-63 and Exercise 2-64 to give Θ(n)
+;;; implementations of union-set and intersection-set for sets
+;;; implemented as (balanced) binary trees.
+
+(define (union-set-tree set1 set2)
+  (list->tree (union-set (tree->list-2 set1)
+                         (tree->list-2 set2))))
+
+(define (intersection-set-tree set1 set2)
+  (list->tree (intersection-set (tree->list-2 set1)
+                                (tree->list-2 set2))))
+
+;;-------------
+;;EXERCISE 2.66
+;;-------------
+
+;;; Implement the lookup procedure for the case where the set of
+;;; records is structured as a binary tree, ordered by the numerical
+;;; values of the keys.
+
+(define (lookup given-key set-of-records)
+  (if (null? set-of-records)
+      #f
+      (let ((this-entry (tree-entry set-of-records)))
+        (let ((this-key (key this-entry)))
+          (cond ((equal? given-key this-key) this-entry)
+                ((< given-key this-key)
+                 (lookup given-key (left-tree set-of-records)))
+                ((> given-key this-key)
+                 (lookup given-key (right-tree set-of-records))))))))
+
+;;----------------------
+;;HUFFMAN ENCODING TREES
+;;----------------------
+
+;;; Representing tree leaves
+(define (make-leaf symbol weight)
+  (list 'leaf symbol weight))
+
+(define (leaf? object)
+  (eq? (car object) 'leaf))
+
+(define (symbol-leaf x) (cadr x))
+
+(define (weight-leaf x) (caddr x))
+
+;;; Representing the tree
+(define (make-code-tree left right)
+  (list left
+        right
+        (append (symbols left) (symbols right))
+        (+ (weight left) (weight right))))
+
+(define (left-branch tree) (car tree))
+
+(define (right-branch tree) (cadr tree))
+
+(define (symbols tree)
+  (if (leaf? tree)
+      (list (symbol-leaf tree))
+      (caddr tree)))
+
+(define (weight tree)
+  (if (leaf? tree)
+      (weight-leaf tree)
+      (cadddr tree)))
+
+;;; Decode a Huffman tree
+
+(define (decode bits tree)
+  (define (decode-1 bits current-branch)
+    (if (null? bits)
+        '()
+        (let ((next-branch
+               (choose-branch (car bits) current-branch)))
+          (if (leaf? next-branch)
+              (cons (symbol-leaf next-branch)
+                    (decode-1 (cdr bits) tree))
+              (decode-1 (cdr bits) next-branch)))))
+  (decode-1 bits tree))
+
+(define (choose-branch bit branch)
+  (cond ((= bit 0) (left-branch branch))
+        ((= bit 1) (right-branch branch))
+        (else (error "bad bit -- CHOOSE-BRANCH" bit))))
+
+
+(define sample-tree
+  (make-code-tree (make-leaf 'A 4)
+                  (make-code-tree
+                   (make-leaf 'B 2)
+                   (make-code-tree (make-leaf 'D 1)
+                                   (make-leaf 'C 1)))))
+
+(define sample-message '(0 1 1 0 0 1 0 1 0 1 1 1 0))
+
+(decode sample-message sample-tree) ;(a d a b b c a)
+
+;;-------------
+;;EXERCISE 2.68
+;;-------------
+
+;;; The encode procedure takes as arguments a message and a tree and
+;;; produces the list of bits that gives the encoded message.
+
+(define (encode message tree)
+  (if (null? message)
+      '()
+      (append (encode-symbol (car message) tree)
+              (encode (cdr message) tree))))
+
+;;; encode-symbol is a procedure, which you must write, that returns
+;;; the list of bits that encodes a given symbol according to a given
+;;; tree. You should design encode-symbol so that it signals an error
+;;; if the symbol is not in the tree at all. Test your procedure by
+;;; encoding the result you obtained in Exercise 2-67 with the sample
+;;; tree and seeing whether it is the same as the original sample
+;;; message.
+
+(define (encode message tree)
+  (if (null? message)
+      '()
+      (append (encode-symbol (car message) tree)
+              (encode (cdr message) tree))))
+
+(define (encode-symbol sym tree)
+  (cond ((leaf? tree) '())
+        ((memq sym (symbols (left-branch tree)))
+         (cons 0 (encode-symbol sym
+                                (left-branch tree))))
+        ((memq sym (symbols (right-branch tree)))
+         (cons 1 (encode-symbol sym
+                                (right-branch tree))))
+        (else (error "sym not in tree"))))
+
+;;-------------
+;;EXERCISE 2.69
+;;-------------
+
+;;; The following procedure takes as its argument a list of
+;;; symbol-frequency pairs (where no symbol appears in more than one
+;;; pair) and generates a Huffman encoding tree according to the
+;;; Huffman algorithm.
+
+(define (generate-huffman-tree pairs)
+  (successive-merge (make-leaf-set pairs)))
+
+;;; make-leaf-set is the procedure given above that transforms the
+;;; list of pairs into an ordered set of leaves. Successive-merge is
+;;; the procedure you must write, using make-code-tree to successively
+;;; merge the smallest-weight elements of the set until there is only
+;;; one element left, which is the desired Huffman tree. (This
+;;; procedure is slightly tricky, but not really complicated. If you
+;;; find yourself designing a complex procedure, then you are almost
+;;; certainly doing something wrong. You can take significant
+;;; advantage of the fact that we are using an ordered set
+;;; representation.)
