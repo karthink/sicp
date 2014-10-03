@@ -2037,19 +2037,126 @@
 
 (define (successive-merge pairs)
   (if (null? (cdr pairs))
-      pairs
-      (successive-merge (adjoin-set (make-code-tree (car pairs)
-                                                    (cadr pairs))
-                                    (cddr pairs)))))
+      (car pairs)
+      (successive-merge
+       (adjoin-set
+        (make-code-tree (car pairs) (cadr pairs))
+        (cddr pairs)))))
 
 ;;; OR
 
 ;; (define (test-merge pairs)
 ;;   (accumulate make-code-tree nil (reverse pairs)))
 
-(generate-huffman-tree '((A 4) (B 2) (C 1) (D 1)))
+;;-------------
+;;EXERCISE 2.70
+;;-------------
 
-(generate-huffman-tree '(( A     2) ( NA   16)
-                        ( BOOM  1) ( SHA  3)
-                        ( GET   2) ( YIP  9)
-                        ( JOB   2) ( WAH  1)))
+;;; The following eight-symbol alphabet with associated relative
+;;; frequencies was designed to efficiently encode the lyrics of 1950s
+;;; rock songs. (Note that the ``symbols'' of an ``alphabet'' need not
+;;; be individual letters.)
+
+;;; A     2 NA   16
+;;; BOOM  1 SHA  3
+;;; GET   2 YIP  9
+;;; JOB   2 WAH  1
+
+;;; Use generate-huffman-tree (Exercise 2-69) to generate a
+;;; corresponding Huffman tree, and use encode (Exercise 2-68) to
+;;; encode the following message:
+
+;;; Get a job
+;;; 
+;;; Sha na na na na na na na na
+;;; 
+;;; Get a job
+;;; 
+;;; Sha na na na na na na na na
+;;; 
+;;; Wah yip yip yip yip yip yip yip yip yip
+;;; 
+;;; Sha boom
+
+;;; How many bits are required for the encoding? What is the smallest
+;;; number of bits that would be needed to encode this song if we used
+;;; a fixed-length code for the eight-symbol alphabet?
+
+(define song '(GET A JOB
+                   SHA NA NA NA NA NA NA NA NA
+                   GET A JOB
+                   SHA NA NA NA NA NA NA NA NA
+                   WAH YIP YIP YIP YIP YIP YIP YIP YIP YIP
+                   SHA BOOM))
+
+(define songtree (generate-huffman-tree '(( A     2) ( NA   16)
+                                          ( BOOM  1) ( SHA  3)
+                                          ( GET   2) ( YIP  9)
+                                          ( JOB   2) ( WAH  1))))
+
+(encode song songtree)
+
+;;; (1 1 1 1 1 1 1 0 0 1 1 1 1 0 1 1 1 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1
+;;; 0 0 1 1 1 1 0 1 1 1 0 0 0 0 0 0 0 0 0 1 1 0 1 0 1 0 1 0 1 0 1 0 1
+;;; 0 1 0 1 0 1 0 1 0 1 1 1 0 1 1 0 1 1)
+
+(length (encode song songtree)) ;;; 84 bits
+
+;;; With a fixed length code, we would need 3 bits per symbol. (There
+;;; are 8 = 2^3 symbols). The number of symbols in the message is:
+
+(length song) ;;; 36, so 36 * 3 = 108 bits.
+
+;;-------------
+;;EXERCISE 2.71
+;;-------------
+
+;;; Suppose we have a Huffman tree for an alphabet of n symbols, and
+;;; that the relative frequencies of the symbols are 1, 2, 4, ...,
+;;; 2^(n-1). Sketch the tree
+
+;;; for n=5
+;;; for n=10.
+
+;;; In such a tree (for general n) how may bits are required to encode
+;;; the most frequent symbol? the least frequent symbol?
+
+;;; Sketch omitted.
+
+(define n5tree (generate-huffman-tree '((A 1) (B 2) (C 4) (D 8) (E 16))))
+(define n10tree (generate-huffman-tree '((A 1) (B 2) (C 4) (D 8) (E 16)
+                                         (F 32) (G 64) (H 128) (I 256) (J 512))))
+
+;;; The most frequent symbol requires 1 bit. The least frequent symbol
+;;; requires (n-1) symbols.
+
+;;-------------
+;;EXERCISE 2.72
+;;-------------
+
+;;; Consider the encoding procedure that you designed in Exercise
+;;; 2-68. What is the order of growth in the number of steps needed to
+;;; encode a symbol? Be sure to include the number of steps needed to
+;;; search the symbol list at each node encountered. To answer this
+;;; question in general is difficult. Consider the special case where
+;;; the relative frequencies of the n symbols are as described in
+;;; Exercise 2-71, and give the order of growth (as a function of n)
+;;; of the number of steps needed to encode the most frequent and
+;;; least frequent symbols in the alphabet.
+
+;;; The height of the tree is O(log(n)).
+
+;;; Checking if a symbol is a member of (symbols tree) is an
+;;; O(length(tree)) operation. In the worst case, it's O(n) for n
+;;; symbols. There are O(log(n)) such calls to encode-symbol, which is
+;;; a tree traversal. So the operation is (roughly) O(n log(n)).
+
+;;; For the special case, the least frequent symbol takes O(n^2)
+;;; steps, because there are n-1 nodes to visit and as many membership
+;;; tests to perform, each of which is O(n). The most frequent symbol
+;;; takes O(n) steps because there is exactly one membership test to
+;;; perform.
+
+
+
+
