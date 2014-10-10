@@ -1,3 +1,23 @@
+(define global-array '())
+
+(define (make-entry k v) (list k v))
+(define (key entry) (car entry))
+(define (value entry) (cadr entry))
+
+(define (put op type item)
+  (define (put-helper k array)
+    (cond ((null? array) (list(make-entry k item)))
+          ((equal? (key (car array)) k) array)
+          (else (cons (car array) (put-helper k (cdr array))))))
+  (set! global-array (put-helper (list op type) global-array)))
+
+(define (get op type)
+  (define (get-helper k array)
+    (cond ((null? array) #f)
+          ((equal? (key (car array)) k) (value (car array)))
+          (else (get-helper k (cdr array)))))
+  (get-helper (list op type) global-array))
+
 ;;-------------
 ;;EXERCISE 2.73
 ;;-------------
@@ -141,4 +161,58 @@
 ;;; integrate the files that will satisfy headquarters' needs while
 ;;; preserving the existing autonomy of the divisions.
 
+;;; Will get around to it soon
+
+;;-------------
+;;EXERCISE 2.75
+;;-------------
+
+;;; Implement the constructor make-from-mag-ang in message-passing
+;;; style. This procedure should be analogous to the
+;;; make-from-real-imag procedure given above.
+
+(define (make-from-mag-ang r t)
+  (define (dispatch op)
+    (cond ((eq? op 'real-part ) (* r (cos t)))
+          ((eq? op 'imag-part ) (* r (sin t)))
+          ((eq? op 'magnitude ) r)
+          ((eq? op 'angle     ) t)
+          (else
+           (error "Unknown op -- MAKE-FROM-MAG-ANG" op))))
+  dispatch)
+
+;;-------------
+;;EXERCISE 2.76
+;;-------------
+
+;;; As a large system with generic operations evolves, new types of
+;;; data objects or new operations may be needed. For each of the
+;;; three strategies---generic operations with explicit dispatch,
+;;; data-directed style, and message-passing-style---describe the
+;;; changes that must be made to a system in order to add new types or
+;;; new operations. Which organization would be most appropriate for a
+;;; system in which new types must often be added? Which would be most
+;;; appropriate for a system in which new operations must often be
+;;; added?
+
+;;; 1. generic operations with explicit dispatch: When adding new
+;;; types, each operation has to be modified to account for a new
+;;; type-tag. When adding a new operation, it has to be written
+;;; accounting for all the existing types.
+
+;;; 2. data-directed style: When adding a new type, a new column needs
+;;; to be created in the type table. When adding a new operation, a
+;;; new row needs to be added. The former will require writing a new
+;;; version of all existing operations. The latter will require
+;;; writing a different version of the operation for each existing
+;;; type.
+
+;;; 3. message-passing: Adding a new type will require writing a new
+;;; constructor for that type. Adding a new operation will require
+;;; modifying all existing constructors with an additional cond
+;;; clause.
+
+;;; For a system with frequent new types, message-passing is the most
+;;; easily additive method. For a system with frequent new operations,
+;;; the data-directed style is preferable.
 
