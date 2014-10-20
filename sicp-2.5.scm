@@ -1,28 +1,5 @@
 ;;; Helper functions
-(load "sicp-2-helper.scm")
-
-(define (add x y) (apply-generic 'add x y))
-(define (sub x y) (apply-generic 'sub x y))
-(define (mul x y) (apply-generic 'mul x y))
-(define (div x y) (apply-generic 'div x y))
-
-(define (install-scheme-number-package)
-  (define (tag x)
-    (attach-tag 'scheme-number x))
-  (put 'add '(scheme-number scheme-number)
-       (lambda (x y) (tag (+ x y))))
-  (put 'sub '(scheme-number scheme-number)
-       (lambda (x y) (tag (- x y))))
-  (put 'mul '(scheme-number scheme-number)
-       (lambda (x y) (tag (* x y))))
-  (put 'div '(scheme-number scheme-number)
-       (lambda (x y) (tag (/ x y))))
-  (put 'make 'scheme-number
-       (lambda (x) (tag x)))
-  'done)
-
-(define (make-scheme-number n)
-  ((get 'make 'scheme-number) n))
+(load "sicp-2.4-helper.scm")
 
 ;;--------------
 ;;EXERCISE 2.77:
@@ -426,7 +403,9 @@
     (let ((proc (get op type-tags)))
       (if proc                          ;;ONLY CHANGE
           (let ((res (apply proc (map contents args))))
-            (if (equal? proc 'project) res (drop (res)))) 
+            (if (equal? proc 'project)
+                res
+                (drop (res)))) 
           (if (= (length args) 2)
               (let ((type1 (car type-tags))
                     (type2 (cadr type-tags))
