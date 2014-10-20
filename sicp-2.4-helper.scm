@@ -7,6 +7,10 @@
 (define (square x) (* x x))
 (define nil '())
 (define identity (lambda (entity) entity))
+(define (gcd a b)
+  (cond ((> b a) (gcd b a))
+        ((= b 0) a)
+        (else (gcd b (remainder a b)))))
 ;----------------------------------------------------------------
 
 ;;-------------------
@@ -220,6 +224,10 @@
        =zero?)
   (put 'equ? '(complex complex)
        equ?)
+  
+  ;; project procedure from ex. 2.85
+  (put 'project '(complex)
+     (lambda (c) (make-real (real-part c))))
   'done)
 
 (define (make-complex-from-real-imag x y)
@@ -273,8 +281,11 @@
   (put '=zero? '(rational)
        =zero?)
   ;; raise procedure from ex. 2.83
-  (put 'raise 'rational
-       (lambda (raise r) (make-real (/ (numer r) (denom r)))))
+  (put 'raise '(rational)
+       (lambda (r) (make-real (/ (numer r) (denom r)))))
+  ;; project procedure from ex. 2.85
+  (put 'project 'rational
+     (lambda (r) (round (/ (numer r) (denom r)))))
   'done)
 
 (define (make-rational n d)
@@ -300,13 +311,28 @@
   (put '=zero? '(scheme-number)
        (lambda (n) (= n 0)))
   ;; raise procedure from ex. 2.83
+  (put 'raise '(scheme-number)
+       (lambda (n)
+         (cond ((integer? n)
+                (make-rational n 1))
+               (else
+                (make-complex-from-real-imag n 0)))))
+  ;; project procedure from ex. 2.85
+  (put 'project '(scheme-number)
+       (lambda (n)
+         (cond ((integer? n)
+                n)
+               (else
+                (let ((r (rationalize (inexact->exact n) 1/1000)))
+                  (make-rational (numerator r)
+                                 (denominator r)))))))
   'done)
 
 (define (install-real-package)
   (define (tag x)
     (attach-tag 'real x))
   (define (make-real x)
-    ((get 'make 'scheme-number) x))
+    ((get 'make 'scheme-number) (+ x 0.0)))
   (put 'make 'real (lambda (x) (tag (make-real x))))
   (put 'add '(real real) (lambda (x y) (tag (add x y))))
   (put 'sub '(real real) (lambda (x y) (tag (sub x y))))
@@ -314,9 +340,8 @@
   (put 'div '(real real) (lambda (x y) (tag (div x y))))
   (put 'equ? '(real real) (lambda (x y) (equ? x y)))
   (put '=zero? '(real) (lambda (n) (=zero? x y)))
-  ;; raise procedure from ex. 2.83
-  (put 'raise '(real)
-       (lambda (r) (make-complex-from-real-imag r 0)))
+  (put 'raise '(real) raise)
+  (put 'project '(real) project)
   'done)
 
 (define (install-integer-package)
@@ -325,18 +350,13 @@
   (define (make-integer x)
     ((get 'make 'scheme-number) x))
   (put 'make 'integer (lambda (x) (tag (make-integer x))))
-  ;; (define (tag-and-install op)
-  ;;   (put (quote op) '(integer integer) (lambda (x y) (tag (op x y)))))
-  
-  ;; (tag-and-install add)
   (put 'add '(integer integer) (lambda (x y) (tag (add x y))))
   (put 'sub '(integer integer) (lambda (x y) (tag (sub x y))))
   (put 'mul '(integer integer) (lambda (x y) (tag (mul x y))))
   (put 'div '(integer integer) (lambda (x y) (tag (div x y))))
   (put 'equ? '(integer integer) (lambda (x y) (equ? x y)))
   (put '=zero? '(integer) (lambda (n) (=zero? n)))
-  ;; raise procedure from ex. 2.83
-  (put 'raise '(integer) (lambda (r) (make-rational r 1)))
+  (put 'raise '(integer) raise)
   'done)
 
 (define (make-scheme-number n)
@@ -345,8 +365,6 @@
   ((get 'make 'real) n))
 (define (make-integer n)
   ((get 'make 'integer) n))
-
-(define make-integer make-scheme-number)
 
 ;;; Generic operations
 ;----------------------------------------------------------------
@@ -363,6 +381,8 @@
 (define (=zero? x) (apply-generic '=zero? x))
 ;;; from ex. 2.83
 (define (raise num) (apply-generic 'raise num))
+;;; from ex. 2.85
+(define (project num) (apply-generic 'project num))
 
 ;;; apply-generic with coercion
 ;----------------------------------------------------------------

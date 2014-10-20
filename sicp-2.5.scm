@@ -122,7 +122,7 @@
   (put 'equ? '(rational-number rational-number) equ?)
 
   (define (=zero? r) (= 0 (numer r)))
-  (put '=zero? 'rational-number =zero?)))
+  (put '=zero? 'rational-number =zero?))
 
 (define (equ? x y) (apply-generic 'equ? x y))
 (define (=zero? x) (apply-generic '=zero? x))
@@ -307,9 +307,12 @@
   ;; Raise arg1 into an entity of type arg2 and return it.
   (if (equal? (type-tag arg1) (type-tag arg2))
       arg1
-      (let ((raise (get 'raise (type-tag arg1))))
+      (let ((raise (get 'raise (list (type-tag arg1)))))
         (if raise
-            (raise-up-from (raise arg1) arg2)
+            (raise-up-from (apply-generic 'raise arg1) arg2)
+            ;; (note: (raise arg1) does not work in the above
+            ;; expression. This is because arg1 has a type-tag to be
+            ;; stripped, the raise procedure does not strip it.
             #f))))
   
   (let ((type-tags (map type-tag args)))
@@ -368,9 +371,14 @@
      (lambda (c) (make-real (real-part c))))
 
 ;;; in the real number package
-(put 'project 'real
-     (lambda (r) (make-rational ;WHAT HERE?
-             )))
+(put 'project '(scheme-number)
+       (lambda (n)
+         (cond ((integer? n)
+                n)
+               (else
+                (let ((r (rationalize (inexact->exact n) 1/1000)))
+                  (make-rational (numerator r)
+                                 (denominator r)))))))
 
 ;;; in the rational number package
 (put 'project 'rational
@@ -380,7 +388,7 @@
 (define (project num) (apply-generic 'project num))
 
 (define (drop num)
-  (if (equal? (type-tag num) 'scheme-number)
+  (if (equal? (type-tag num) 'integer)
       num
       (let ((pnum (project num)))
         (if (equ? num (raise pnum))
@@ -396,7 +404,7 @@
       arg1
       (let ((raise (get 'raise (type-tag arg1))))
         (if raise
-            (raise-up-from (raise arg1) arg2)
+            (raise-up-from (apply-generic 'raise arg1) arg2)
             #f))))
   
   (let ((type-tags (map type-tag args)))
