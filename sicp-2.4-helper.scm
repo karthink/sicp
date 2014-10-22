@@ -284,8 +284,8 @@
   (put 'raise '(rational)
        (lambda (r) (make-real (/ (numer r) (denom r)))))
   ;; project procedure from ex. 2.85
-  (put 'project 'rational
-     (lambda (r) (round (/ (numer r) (denom r)))))
+  (put 'project '(rational)
+       (lambda (r) (make-integer (round (/ (numer r) (denom r))))))
   'done)
 
 (define (make-rational n d)

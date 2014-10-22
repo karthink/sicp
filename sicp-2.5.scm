@@ -254,7 +254,83 @@
 ;;; coercion procedures '(t1->t2 t2->t3 t3->t1...). (Note that some of
 ;;; these procedures may not exist in the coercion table).
 
-;;; TODO
+;;; Generate all permutations of '(these tag types).
+;;; Gives '((these these these)
+;;;         (these these tag)
+;;;         (these tag these)...)
+(define (permutations args positions)
+  (define (adjoin-term term)
+    (map (lambda (perm-lst) (cons term perm-lst))
+         (permutations args (- positions 1))))
+  (if (zero? positions)
+      '(())
+      (flatmap adjoin-term args)))
+
+(define (in-coercion-table? my-type-tags perm)
+  (if (null? perm)
+      #t
+      (and (or
+            ;; same type, no coercion needed:
+            (eq? (car my-type-tags) (car perm))
+            ;; coercion possible:
+            (get-coercion (car my-type-tags) (car perm))) 
+           (in-coercion-table? (cdr my-type-tags) (cdr perm)))))
+
+;;; Keep only the type combinations that can be enforced through
+;;; coercion and operated upon by a prcedure from the get/put table.
+(let ((coerced-args 
+       (filter (lambda (perm) (and (get 'add perm)
+                              (in-coercion-table? type-tags perm)))
+               (permutations type-tags (length type-tags)))))
+
+;;; Every element of the list above is a possible coercion of the
+;;; argument types that can be operated upon. Just pick the first one
+;;; and use apply-generic.
+  (if (not (null? (car coerced-args)))
+      (apply-generic op . (car coerced-args))
+      (error "No method for these types" (list args type-tags))))
+
+
+;;; apply-generic modified with these changes:
+
+(define (apply-generic op . args)
+  
+  (define (permutations args positions)
+    (define (adjoin-term term)
+      (map (lambda (perm-lst) (cons term perm-lst))
+           (permutations args (- positions 1))))
+    (if (zero? positions)
+        '(())
+        (flatmap adjoin-term args)))  
+  
+  (define (in-coercion-table? my-type-tags perm)
+  (if (null? perm)
+      #t
+      (and (or
+            ;; same type, no coercion needed:
+            (eq? (car my-type-tags) (car perm))
+            ;; coercion possible:
+            (get-coercion (car my-type-tags) (car perm))) 
+           (in-coercion-table? (cdr my-type-tags) (cdr perm)))))
+  
+  (define (coerce-args new-type-tags)
+    (map (lambda (f arg) (f arg))
+         (map (lambda (old-type new-type)
+                (or  (get-coercion old-type new-type) identity))
+              type-tags new-type-tags)
+         args))
+  
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+          (apply proc (map contents args))
+          (let ((coerced-types 
+                 (filter (lambda (perm) (and (get op perm)
+                                        (in-coercion-table? type-tags perm)))
+                         (permutations type-tags (length type-tags)))))
+            (if (not (null? (car coerced-types)))
+                (apply apply-generic (cons op (coerce-args (car coerced-types))))
+                (error "No method for these types" (list args type-tags))))))))
 
 ;;--------------
 ;;EXERCISE 2.83:
@@ -380,6 +456,7 @@
                   (make-rational (numerator r)
                                  (denominator r)))))))
 
+
 ;;; in the rational number package
 (put 'project 'rational
      (lambda (r) (round (/ (numer r) (denom r)))))
@@ -393,7 +470,7 @@
       (let ((pnum (project num)))
         (if (equ? num (raise pnum))
             (drop pnum)
-            pnum))))
+            num))))
 
 ;;; Simplified apply-generic
 (define (apply-generic op . args)
@@ -402,7 +479,7 @@
   ;; Raise arg1 into an entity of type arg2 and return it.
   (if (equal? (type-tag arg1) (type-tag arg2))
       arg1
-      (let ((raise (get 'raise (type-tag arg1))))
+      (let ((raise (get 'raise (list (type-tag arg1)))))
         (if raise
             (raise-up-from (apply-generic 'raise arg1) arg2)
             #f))))
@@ -413,7 +490,7 @@
           (let ((res (apply proc (map contents args))))
             (if (equal? proc 'project)
                 res
-                (drop (res)))) 
+                (drop res))) 
           (if (= (length args) 2)
               (let ((type1 (car type-tags))
                     (type2 (cadr type-tags))
@@ -427,7 +504,7 @@
                         (a2->type1
                          (apply-generic op a1 a2->type1))
                         (else
-                         (error "No method for these types"
+                         (error "No coercion method for these types"
                                 (list op type-tags))))))
               (error "No method for these types"
                      (list op type-tags)))))))
